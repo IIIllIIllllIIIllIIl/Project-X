@@ -1,0 +1,405 @@
+-- VF Staff alert by we1qxpo7j8fgkh3ok0ji
+-- ESP toggle (T)
+-- Current Staff (F1)
+-- Join + Leave sounds
+
+local GROUP_ID = 128056089
+
+local Players          = game:GetService("Players")
+local StarterGui       = game:GetService("StarterGui")
+local CoreGui          = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local SoundService     = game:GetService("SoundService")
+
+-- === AUDIO CONFIG ===
+local JOIN_SOUND_ID  = "rbxassetid://8887499160"
+local LEAVE_SOUND_ID = "rbxassetid://1091083826"
+local JOIN_VOLUME    = 2
+local LEAVE_VOLUME   = 2
+
+local function playOnce(soundId, volume)
+    local s = Instance.new("Sound")
+    s.SoundId = soundId
+    s.Volume = volume or 2
+    s.Looped = false
+    s.PlayOnRemove = false
+    s.Parent = SoundService
+    local ok = pcall(function() SoundService:PlayLocalSound(s) end)
+    if not ok then pcall(function() s:Play() end) end
+    s.Ended:Connect(function() if s.Parent then s:Destroy() end end)
+end
+-- === END AUDIO CONFIG ===
+
+-- === UNDERCOVER WATCHLIST (UserIds) ===
+local UNDERCOVER_USERIDS = {
+    [3860151481]  = true,
+    [1336767736]  = true,
+    [1649686630]  = true,
+    [1572762983]  = true,
+    [1464049899]  = true,
+    [35301832]    = true,
+    [5003063221]  = true,
+    [10422828304] = true,
+    [893987861]   = true,
+    [1518920775]  = true,
+    [167515541]   = true,
+    [417695901]   = true,
+    [10418656725] = true,
+    [3130721894]  = true,
+    [2290651851]  = true,
+    [570642875]   = true,
+    [10423842558] = true,
+    [1537923218]  = true,
+    [34252185]    = true,
+    [856837596]   = true,
+    [14365765]    = true,
+    [7558939520]  = true,
+    [10279815564] = true,
+    [9821294795]  = true,
+    [10413647879] = true,
+    [10404456287] = true,
+    [10445631440] = true, 
+    [4559062275]  = true,
+}
+
+local function isUndercoverWatched(userId)
+    return UNDERCOVER_USERIDS[userId] == true
+end
+
+local SPECIAL_TAGS = {
+    [2309457259] = "👑",
+    [9242413057] = "🪐",
+}
+local tagLoops = {}
+
+local function getSpecialEmoji(userId)
+    return SPECIAL_TAGS[userId]
+end
+
+local function desiredSpecialDisplay(player)
+    local emoji = getSpecialEmoji(player.UserId)
+    if not emoji then return nil end
+    return ("[%s] %s"):format(emoji, player.DisplayName)
+end
+
+local function applySpecialTagOnce(char, player)
+    if not char or not player then return end
+    local desired = desiredSpecialDisplay(player)
+    if not desired then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    if hum.DisplayName ~= desired then
+        hum.DisplayName = desired
+    end
+end
+
+local function startSpecialTagLoop(player)
+    if not player then return end
+    if not getSpecialEmoji(player.UserId) then return end
+    if tagLoops[player.UserId] then return end
+
+    tagLoops[player.UserId] = true
+    task.spawn(function()
+        while tagLoops[player.UserId] and player.Parent do
+            local char = player.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    local desired = desiredSpecialDisplay(player)
+                    if desired and hum.DisplayName ~= desired then
+                        hum.DisplayName = desired
+                    end
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+end
+
+local function stopSpecialTagLoop(player)
+    if not player then return end
+    tagLoops[player.UserId] = nil
+end
+
+-- === UI helpers ===
+local function setCoreSafe(key, payload)
+    pcall(StarterGui.SetCore, StarterGui, key, payload)
+end
+
+local function toast(msg, dur)
+    setCoreSafe("SendNotification", { Title = "Staff Alert", Text = tostring(msg), Duration = dur or 3 })
+end
+
+-- === Group + thumbnail helpers ===
+local function safeIsInGroup(player, groupId)
+    local ok, result = pcall(function() return player:IsInGroup(groupId) end)
+    return ok and result
+end
+
+local function safeGetRoleInGroup(player, groupId)
+    local ok, role = pcall(function() return player:GetRoleInGroup(groupId) end)
+    if ok and type(role) == "string" and role ~= "" then
+        return role
+    end
+    return "Member"
+end
+
+local function getHeadshot(userId)
+    local ok, content = pcall(function()
+        return Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+    end)
+    return ok and content or "rbxassetid://15059364356"
+end
+
+-- === Notifications ===
+local function sendJoinNotiWithRole(player)
+    local role = safeGetRoleInGroup(player, GROUP_ID)
+    setCoreSafe("SendNotification", {
+        Title = player.DisplayName,
+        Text  = string.format("%s (%s) has joined the server.", player.Name, role),
+        Icon  = getHeadshot(player.UserId),
+        Duration = 5
+    })
+end
+
+local function sendLeaveNoti(player)
+    setCoreSafe("SendNotification", {
+        Title = player.DisplayName,
+        Text  = string.format("%s left the server", player.Name),
+        Icon  = getHeadshot(player.UserId),
+        Duration = 5
+    })
+end
+
+local function sendUndercoverNoti(player)
+    setCoreSafe("SendNotification", {
+        Title = player.DisplayName,
+        Text  = "CAUTION UNDERCOVER STAFF HAS JOINED THE SERVER",
+        Icon  = getHeadshot(player.UserId),
+        Duration = 6
+    })
+end
+
+-- === ESP folders ===
+local StaffESPFolder = CoreGui:FindFirstChild("StaffESP") or Instance.new("Folder")
+StaffESPFolder.Name = "StaffESP"
+StaffESPFolder.Parent = CoreGui
+
+local UndercoverESPFolder = CoreGui:FindFirstChild("UndercoverStaffESP") or Instance.new("Folder")
+UndercoverESPFolder.Name = "UndercoverStaffESP"
+UndercoverESPFolder.Parent = CoreGui
+
+local espEnabled = true
+
+local function applyToggleToAll()
+    for _, folder in ipairs({StaffESPFolder, UndercoverESPFolder}) do
+        for _, obj in ipairs(folder:GetChildren()) do
+            if obj:IsA("Highlight") then obj.Enabled = espEnabled end
+        end
+    end
+    toast(("ESP: %s"):format(espEnabled and "ON" or "OFF"))
+end
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp or UserInputService:GetFocusedTextBox() then return end
+
+    if input.KeyCode == Enum.KeyCode.T then
+        espEnabled = not espEnabled
+        applyToggleToAll()
+
+    elseif input.KeyCode == Enum.KeyCode.F1 then
+        -- Show who is currently in the server:
+        -- - In-group staff
+        -- - Undercover watchlist users who are NOT in the group
+        local entries = {}
+
+        for _, plr in ipairs(Players:GetPlayers()) do
+            local inGroup = safeIsInGroup(plr, GROUP_ID)
+
+            if inGroup then
+                table.insert(entries, string.format("%s (@%s)", plr.DisplayName, plr.Name))
+            elseif isUndercoverWatched(plr.UserId) then
+                table.insert(entries, string.format("⚠ UNDERCOVER: %s (@%s)", plr.DisplayName, plr.Name))
+            end
+        end
+
+        if #entries == 0 then
+            toast("No Staff or Undercover users online.", 4)
+        else
+            local list = table.concat(entries, ", ")
+            if #list > 180 then list = list:sub(1, 177) .. "..." end
+            toast(string.format("Staff online (%d): %s", #entries, list), 6)
+        end
+    end
+end)
+
+-- === Staff Highlight helpers (rainbow) ===
+local function staffHlKeyForPlayer(player) return "HL_" .. tostring(player.UserId) end
+
+local function getOrCreateStaffHighlightForPlayer(player)
+    local key = staffHlKeyForPlayer(player)
+    local hl = StaffESPFolder:FindFirstChild(key)
+    if not hl then
+        hl = Instance.new("Highlight")
+        hl.Name = key
+        hl.FillTransparency = 0.55
+        hl.OutlineTransparency = 0.1
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.Parent = StaffESPFolder
+    end
+    hl.Enabled = espEnabled
+    return hl
+end
+
+local function attachStaffChar(player, char)
+    if not player or not char then return end
+    local hl = getOrCreateStaffHighlightForPlayer(player)
+    hl.Adornee = char
+    hl.Enabled = espEnabled
+    applySpecialTagOnce(char, player)
+end
+
+local function detachStaffChar(player)
+    if not player then return end
+    local hl = StaffESPFolder:FindFirstChild(staffHlKeyForPlayer(player))
+    if hl then hl.Adornee = nil end
+end
+
+local function applyESPIfStaff(player)
+    if not player or not player.Parent then return end
+    if not safeIsInGroup(player, GROUP_ID) then return end
+
+    sendJoinNotiWithRole(player)
+    getOrCreateStaffHighlightForPlayer(player)
+
+    if player.Character then
+        attachStaffChar(player, player.Character)
+    end
+    player.CharacterAdded:Connect(function(char)
+        attachStaffChar(player, char)
+    end)
+    player.CharacterRemoving:Connect(function(_) detachStaffChar(player) end)
+end
+
+-- === Undercover Highlight helpers (RED) ===
+local function undercoverHlKeyForPlayer(player) return "UHL_" .. tostring(player.UserId) end
+
+local function getOrCreateUndercoverHighlightForPlayer(player)
+    local key = undercoverHlKeyForPlayer(player)
+    local hl = UndercoverESPFolder:FindFirstChild(key)
+    if not hl then
+        hl = Instance.new("Highlight")
+        hl.Name = key
+        hl.FillTransparency = 0.55
+        hl.OutlineTransparency = 0.1
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.FillColor = Color3.fromRGB(255, 0, 0)
+        hl.OutlineColor = Color3.fromRGB(255, 0, 0)
+        hl.Parent = UndercoverESPFolder
+    end
+    hl.Enabled = espEnabled
+    return hl
+end
+
+local function attachUndercoverChar(player, char)
+    if not player or not char then return end
+    local hl = getOrCreateUndercoverHighlightForPlayer(player)
+    hl.Adornee = char
+    hl.Enabled = espEnabled
+    applySpecialTagOnce(char, player)
+end
+
+local function detachUndercoverChar(player)
+    if not player then return end
+    local hl = UndercoverESPFolder:FindFirstChild(undercoverHlKeyForPlayer(player))
+    if hl then hl.Adornee = nil end
+end
+
+local function applyESPIfUndercover(player)
+    if not player or not player.Parent then return end
+    if not isUndercoverWatched(player.UserId) then return end
+    if safeIsInGroup(player, GROUP_ID) then return end
+
+    sendUndercoverNoti(player)
+    getOrCreateUndercoverHighlightForPlayer(player)
+
+    if player.Character then
+        attachUndercoverChar(player, player.Character)
+    end
+    player.CharacterAdded:Connect(function(char)
+        attachUndercoverChar(player, char)
+    end)
+    player.CharacterRemoving:Connect(function(_) detachUndercoverChar(player) end)
+end
+
+-- Rainbow colors for STAFF highlights only (do NOT affect undercover red)
+task.spawn(function()
+    local hue = 0
+    while true do
+        hue = (hue + 0.01) % 1
+        local color = Color3.fromHSV(hue, 1, 1)
+        for _, obj in ipairs(StaffESPFolder:GetChildren()) do
+            if obj:IsA("Highlight") then
+                obj.FillColor = color
+                obj.OutlineColor = color
+            end
+        end
+        task.wait(0.05)
+    end
+end)
+
+-- Startup: quiet (no sounds for existing players)
+toast("Staff Alert started (T = toggle ESP, F1 = Current Staff)", 5)
+
+for _, plr in ipairs(Players:GetPlayers()) do
+    -- Special emoji tags apply regardless
+    if getSpecialEmoji(plr.UserId) then
+        startSpecialTagLoop(plr)
+        if plr.Character then applySpecialTagOnce(plr.Character, plr) end
+        plr.CharacterAdded:Connect(function(char) applySpecialTagOnce(char, plr) end)
+    end
+
+    -- Real staff: notif + rainbow ESP
+    applyESPIfStaff(plr)
+
+    -- Undercover: CAUTION notif + red ESP
+    applyESPIfUndercover(plr)
+end
+
+-- Join logic:
+-- 1) If undercover ID joins and NOT in group -> CAUTION + red ESP + SAME join sound
+-- 2) If in group -> staff join message with role + rainbow ESP + join sound
+Players.PlayerAdded:Connect(function(plr)
+    -- Start special tag loop immediately if applicable
+    if getSpecialEmoji(plr.UserId) then
+        startSpecialTagLoop(plr)
+        if plr.Character then applySpecialTagOnce(plr.Character, plr) end
+        plr.CharacterAdded:Connect(function(char) applySpecialTagOnce(char, plr) end)
+    end
+
+    local inGroup = safeIsInGroup(plr, GROUP_ID)
+
+    if isUndercoverWatched(plr.UserId) and not inGroup then
+        playOnce(JOIN_SOUND_ID, JOIN_VOLUME) -- same as normal
+        applyESPIfUndercover(plr)
+        return
+    end
+
+    if inGroup then
+        playOnce(JOIN_SOUND_ID, JOIN_VOLUME)
+        applyESPIfStaff(plr)
+    end
+end)
+
+-- Leave: keep original behavior (leave sound + leave noti only for in-group)
+Players.PlayerRemoving:Connect(function(plr)
+    if safeIsInGroup(plr, GROUP_ID) then
+        sendLeaveNoti(plr)
+        playOnce(LEAVE_SOUND_ID, LEAVE_VOLUME)
+    end
+    detachStaffChar(plr)
+    detachUndercoverChar(plr)
+    stopSpecialTagLoop(plr)
+end)
