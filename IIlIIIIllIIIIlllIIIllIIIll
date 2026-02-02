@@ -403,3 +403,193 @@ Players.PlayerRemoving:Connect(function(plr)
     detachUndercoverChar(plr)
     stopSpecialTagLoop(plr)
 end)
+
+do
+    local TextChatService = game:GetService("TextChatService")
+    local Lighting = game:GetService("Lighting")
+    local RunService = game:GetService("RunService")
+    local Players2 = game:GetService("Players")
+    local SoundService2 = game:GetService("SoundService")
+
+    local localPlayer = Players2.LocalPlayer
+
+    -- Sound asset
+    local JUJU_SOUND_ID = "rbxassetid://103606830325471"
+    local JUJU_TARGET_VOLUME = 4
+    local JUJU_START_TIME = 13
+
+    -- Fade settings (sound)
+    local JUJU_FADE_TIME = 3
+    local JUJU_FADE_STEPS = 20
+
+    -- Disco settings (Lighting-only “screen effects”)
+    local JUJU_DISCO_SPEED = 0.25
+    local JUJU_DISCO_FADE_TIME = 1.0
+
+    local currentSound = nil
+    local busy = false
+
+    local discoOn = false
+    local discoConn = nil
+    local discoFadeTweening = false
+
+    local original = {
+        Ambient = Lighting.Ambient,
+        OutdoorAmbient = Lighting.OutdoorAmbient,
+        ColorShift_Top = Lighting.ColorShift_Top,
+        ColorShift_Bottom = Lighting.ColorShift_Bottom,
+        Brightness = Lighting.Brightness,
+    }
+
+    local function fadeVolume(sound, fromVol, toVol)
+        if not sound then return end
+        for i = 1, JUJU_FADE_STEPS do
+            if not sound or not sound.Parent then return end
+            local alpha = i / JUJU_FADE_STEPS
+            sound.Volume = fromVol + (toVol - fromVol) * alpha
+            task.wait(JUJU_FADE_TIME / JUJU_FADE_STEPS)
+        end
+    end
+
+    local function lerpColor(a, b, t)
+        return Color3.new(
+            a.R + (b.R - a.R) * t,
+            a.G + (b.G - a.G) * t,
+            a.B + (b.B - a.B) * t
+        )
+    end
+
+    local function lerpNumber(a, b, t)
+        return a + (b - a) * t
+    end
+
+    local function fadeLightingTo(target, duration)
+        if discoFadeTweening then return end
+        discoFadeTweening = true
+
+        local start = {
+            Ambient = Lighting.Ambient,
+            OutdoorAmbient = Lighting.OutdoorAmbient,
+            ColorShift_Top = Lighting.ColorShift_Top,
+            ColorShift_Bottom = Lighting.ColorShift_Bottom,
+            Brightness = Lighting.Brightness,
+        }
+
+        local t0 = os.clock()
+        while true do
+            local t = (os.clock() - t0) / duration
+            if t >= 1 then t = 1 end
+
+            Lighting.Ambient = lerpColor(start.Ambient, target.Ambient, t)
+            Lighting.OutdoorAmbient = lerpColor(start.OutdoorAmbient, target.OutdoorAmbient, t)
+            Lighting.ColorShift_Top = lerpColor(start.ColorShift_Top, target.ColorShift_Top, t)
+            Lighting.ColorShift_Bottom = lerpColor(start.ColorShift_Bottom, target.ColorShift_Bottom, t)
+            Lighting.Brightness = lerpNumber(start.Brightness, target.Brightness, t)
+
+            if t >= 1 then break end
+            task.wait()
+        end
+
+        discoFadeTweening = false
+    end
+
+    local function stopDisco()
+        discoOn = false
+        if discoConn then
+            discoConn:Disconnect()
+            discoConn = nil
+        end
+
+        task.spawn(function()
+            fadeLightingTo(original, JUJU_DISCO_FADE_TIME)
+        end)
+    end
+
+    local function startDisco()
+        if discoOn then return end
+        discoOn = true
+
+        task.spawn(function()
+            fadeLightingTo({
+                Ambient = original.Ambient,
+                OutdoorAmbient = original.OutdoorAmbient,
+                ColorShift_Top = original.ColorShift_Top,
+                ColorShift_Bottom = original.ColorShift_Bottom,
+                Brightness = math.max(original.Brightness, 2),
+            }, JUJU_DISCO_FADE_TIME)
+        end)
+
+        local hue = 0
+        discoConn = RunService.RenderStepped:Connect(function(dt)
+            if not discoOn then return end
+            hue = (hue + dt * JUJU_DISCO_SPEED) % 1
+            local c = Color3.fromHSV(hue, 1, 1)
+
+            Lighting.Ambient = c
+            Lighting.OutdoorAmbient = c
+            Lighting.ColorShift_Top = c
+            Lighting.ColorShift_Bottom = c
+        end)
+    end
+
+    local function stopSound()
+        if currentSound then
+            local s = currentSound
+            currentSound = nil
+
+            fadeVolume(s, s.Volume, 0)
+            s:Stop()
+            s:Destroy()
+        end
+    end
+
+    local function playSound()
+        stopSound()
+
+        local s = Instance.new("Sound")
+        s.SoundId = JUJU_SOUND_ID
+        s.Volume = 0
+        s.Parent = SoundService2
+
+        s.TimePosition = JUJU_START_TIME
+
+        currentSound = s
+        s:Play()
+
+        fadeVolume(s, 0, JUJU_TARGET_VOLUME)
+
+        s.Ended:Connect(function()
+            if currentSound == s then
+                currentSound = nil
+            end
+            s:Destroy()
+            stopDisco()
+        end)
+    end
+
+    local function toggleParty()
+        if busy then return end
+        busy = true
+
+        if currentSound and currentSound.IsPlaying then
+            stopSound()
+            stopDisco()
+        else
+            startDisco()
+            playSound()
+        end
+
+        task.delay(0.2, function()
+            busy = false
+        end)
+    end
+
+    TextChatService.MessageReceived:Connect(function(message)
+        if message.TextSource and message.TextSource.UserId == localPlayer.UserId then
+            local text = string.lower(message.Text):gsub("^%s*(.-)%s*$", "%1")
+            if text == "juju" then
+                toggleParty()
+            end
+        end
+    end)
+end
