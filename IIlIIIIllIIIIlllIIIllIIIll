@@ -1,356 +1,269 @@
--- VF Staff alert by we1qxpo7j8fgkh3ok0ji
--- ESP toggle (T)
--- Current Staff (F1)
--- Join + Leave sounds
+--========================================================--
+--  VF Staff Alert by we1qxpo7j8fgkh3ok0ji
+--  Keybind: right ctrl
+----========================================================--
 
-local GROUP_ID = 128056089
-
-local Players          = game:GetService("Players")
-local StarterGui       = game:GetService("StarterGui")
-local CoreGui          = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local SoundService     = game:GetService("SoundService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local StarterGui = game:GetService("StarterGui")
+local CoreGui = game:GetService("CoreGui")
+local SoundService = game:GetService("SoundService")
 
--- === AUDIO CONFIG ===
-local JOIN_SOUND_ID  = "rbxassetid://8887499160"
-local LEAVE_SOUND_ID = "rbxassetid://1091083826"
-local JOIN_VOLUME    = 2
-local LEAVE_VOLUME   = 2
+local localPlayer = Players.LocalPlayer
 
-local function playOnce(soundId, volume)
-    local s = Instance.new("Sound")
-    s.SoundId = soundId
-    s.Volume = volume or 2
-    s.Looped = false
-    s.PlayOnRemove = false
-    s.Parent = SoundService
-    local ok = pcall(function() SoundService:PlayLocalSound(s) end)
-    if not ok then pcall(function() s:Play() end) end
-    s.Ended:Connect(function() if s.Parent then s:Destroy() end end)
+local function randomString(len)
+    local res = {}
+    for i = 1, len do
+        res[i] = string.char(math.random(97, 122))
+    end
+    return table.concat(res)
 end
--- === END AUDIO CONFIG ===
 
--- === UNDERCOVER WATCHLIST (UserIds) ===
-local UNDERCOVER_USERIDS = {
-    [10404456287] = true,
-    [10413647879] = true,
-    [10279815564] = true,
-    [7558939520]  = true,
-    [7208442785]  = true,
-    [856837596]   = true,
-    [3869228]     = true,
-    [14365765]    = true,
-    [375117549]   = true,
-    [1537923218]  = true,
-    [570642875]   = true,
-    [35301832]    = true,
-    [3860151481]  = true,
-    [1649686630]  = true,
-    [2290651851]  = true,
-    [4423560567]  = true,
-    [167515541]   = true,
-    [2734316662]  = true,
-    [2799921403]  = true,
-    [3685035204]  = true,
-    [3270461823]  = true,
-    [3740191158]  = true,
-    [1617828795]  = true,
-    [1987394728]  = true,
-    [3889850179]  = true,
-    [5003063221]  = true,
-    [32435725]    = true,
-    [1236712946]  = true,
-    [1572762983]  = true,
-    [5644420194]  = true,
-    [1094365126]  = true,
-    [461435528]   = true,
-    [4138598689]  = true,
-    [3812472402]  = true,
-    [9821294795]  = true,
-    [10423842558] = true,
-    [4559062275]  = true,
-    [2912939789]  = true,
+local ids = {
+    gui = randomString(12),
+    main = randomString(10),
+    header = randomString(9),
+    logo = randomString(8),
+    title = randomString(7),
+    status = randomString(9),
+    close = randomString(6),
+    content = randomString(11)
 }
 
-local function isUndercoverWatched(userId)
-    return UNDERCOVER_USERIDS[userId] == true
-end
+local theme = {
+    BackgroundPrimary = Color3.fromRGB(5, 5, 15),
+    BackgroundSecondary = Color3.fromRGB(10, 10, 25),
+    BackgroundTertiary = Color3.fromRGB(15, 15, 35),
+    AccentPrimary = Color3.fromRGB(0, 100, 255), -- Deep Neon Blue
+    AccentSecondary = Color3.fromRGB(31, 81, 255), -- Cyan Neon
+    TextPrimary = Color3.fromRGB(255, 255, 255),
+    TextSecondary = Color3.fromRGB(150, 180, 255),
+    Success = Color3.fromRGB(0, 255, 150),
+    Warning = Color3.fromRGB(255, 100, 0),
+    ToggleKey = Enum.KeyCode.RightControl
+}
+
+local config = {
+    StaffESPEnabled = true,
+    NotificationsEnabled = true,
+    SoundsEnabled = true,
+    GroupId = 866697749
+}
+
+local state = {
+    Visible = true,
+    TagLoops = {},
+    Connections = {},
+    StaffESPFolder = nil,
+    UndercoverESPFolder = nil,
+    Notifications = {}
+}
+
+-- === DATA ===
+local UNDERCOVER_USERIDS = {
+    [10404456287] = true, [10413647879] = true, [10279815564] = true, [7558939520] = true,
+    [7208442785] = true, [856837596] = true, [3869228] = true, [14365765] = true,
+    [375117549] = true, [1537923218] = true, [570642875] = true, [35301832] = true,
+    [3860151481] = true, [1649686630] = true, [2290651851] = true, [4423560567] = true,
+    [167515541] = true, [2734316662] = true, [2799921403] = true, [3685035204] = true,
+    [3270461823] = true, [3740191158] = true, [1617828795] = true, [1987394728] = true,
+    [3889850179] = true, [5003063221] = true, [32435725] = true, [10418656725] = true, 
+    [2309457259] = true [1236712946] = true, [1572762983] = true, [5644420194] = true, [1094365126] = true, [461435528] = true,
+    [4138598689] = true, [3812472402] = true, [9821294795] = true, [10423842558] = true,
+    [4559062275] = true, [2912939789] = true
+}
 
 local SPECIAL_TAGS = {
     [2309457259] = "👑",
     [9242413057] = "🪐",
 }
-local tagLoops = {}
 
-local function getSpecialEmoji(userId)
-    return SPECIAL_TAGS[userId]
+-- === HELPERS ===
+local function tween(obj, props, time, style)
+    local t = TweenService:Create(obj, TweenInfo.new(time or 0.3, style or Enum.EasingStyle.Quad), props)
+    t:Play()
+    return t
 end
 
-local function desiredSpecialDisplay(player)
-    local emoji = getSpecialEmoji(player.UserId)
-    if not emoji then return nil end
-    return ("[%s] %s"):format(emoji, player.DisplayName)
+local function addGlow(parent, color, transparency)
+    local glow = Instance.new("ImageLabel")
+    glow.Name = randomString(6)
+    glow.BackgroundTransparency = 1
+    glow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    glow.Size = UDim2.new(1, 60, 1, 60)
+    glow.AnchorPoint = Vector2.new(0.5, 0.5)
+    glow.Image = "rbxasset://textures/ui/Glow.png"
+    glow.ImageColor3 = color
+    glow.ImageTransparency = transparency or 0.5
+    glow.ZIndex = parent.ZIndex - 1
+    glow.Parent = parent
 end
 
-local function applySpecialTagOnce(char, player)
-    if not char or not player then return end
-    local desired = desiredSpecialDisplay(player)
-    if not desired then return end
+local function addGradient(parent, c1, c2, rot)
+    local grad = Instance.new("UIGradient")
+    grad.Color = ColorSequence.new(c1, c2)
+    grad.Rotation = rot or 90
+    grad.Parent = parent
+end
 
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-
-    if hum.DisplayName ~= desired then
-        hum.DisplayName = desired
+-- === NOTIFICATIONS ===
+local function updateNotifPositions()
+    for i, notif in ipairs(state.Notifications) do
+        local targetPos = UDim2.new(1, -320, 0.95, -((i-1) * 90))
+        tween(notif, {Position = targetPos}, 0.3)
     end
 end
 
-local function startSpecialTagLoop(player)
-    if not player then return end
-    if not getSpecialEmoji(player.UserId) then return end
-    if tagLoops[player.UserId] then return end
+local function notify(title, text, duration, type)
+    if not config.NotificationsEnabled then return end
+    local color = type == "success" and theme.Success or (type == "warning" and theme.Warning or theme.AccentSecondary)
+    
+    local frame = Instance.new("Frame")
+    frame.BackgroundColor3 = theme.BackgroundPrimary
+    frame.Position = UDim2.new(1, 20, 0.95, 0)
+    frame.Size = UDim2.new(0, 300, 0, 80)
+    frame.AnchorPoint = Vector2.new(0, 1)
+    frame.ZIndex = 10000
+    frame.Parent = CoreGui.RobloxGui:FindFirstChild(ids.gui) or CoreGui.RobloxGui
 
-    tagLoops[player.UserId] = true
-    task.spawn(function()
-        while tagLoops[player.UserId] and player.Parent do
-            local char = player.Character
-            if char then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then
-                    local desired = desiredSpecialDisplay(player)
-                    if desired and hum.DisplayName ~= desired then
-                        hum.DisplayName = desired
-                    end
-                end
-            end
-            task.wait(0.5)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Color = color
+    stroke.Thickness = 2
+    addGlow(frame, color, 0.6)
+
+    local tl = Instance.new("TextLabel", frame)
+    tl.BackgroundTransparency = 1
+    tl.Position = UDim2.new(0, 15, 0, 10)
+    tl.Size = UDim2.new(1, -30, 0, 22)
+    tl.Font = Enum.Font.GothamBold
+    tl.Text = title
+    tl.TextColor3 = color
+    tl.TextSize = 14
+    tl.TextXAlignment = Enum.TextXAlignment.Left
+    tl.ZIndex = 10001
+
+    local bl = Instance.new("TextLabel", frame)
+    bl.BackgroundTransparency = 1
+    bl.Position = UDim2.new(0, 15, 0, 35)
+    bl.Size = UDim2.new(1, -30, 0, 35)
+    bl.Font = Enum.Font.Gotham
+    bl.Text = text
+    bl.TextColor3 = theme.TextSecondary
+    bl.TextSize = 11
+    bl.TextWrapped = true
+    bl.TextXAlignment = Enum.TextXAlignment.Left
+    bl.TextYAlignment = Enum.TextYAlignment.Top
+    bl.ZIndex = 10001
+
+    table.insert(state.Notifications, 1, frame)
+    updateNotifPositions()
+
+    task.delay(duration or 3, function()
+        tween(frame, {Position = UDim2.new(1, 20, frame.Position.Y.Scale, frame.Position.Y.Offset)}, 0.4)
+        task.wait(0.4)
+        local idx = table.find(state.Notifications, frame)
+        if idx then
+            table.remove(state.Notifications, idx)
+            updateNotifPositions()
         end
+        frame:Destroy()
     end)
 end
 
-local function stopSpecialTagLoop(player)
-    if not player then return end
-    tagLoops[player.UserId] = nil
+-- === STAFF LOGIC ===
+local function playSound(id, vol)
+    if not config.SoundsEnabled then return end
+    local s = Instance.new("Sound")
+    s.SoundId = id
+    s.Volume = vol or 2
+    s.Parent = SoundService
+    pcall(function() SoundService:PlayLocalSound(s) end)
+    s.Ended:Connect(function() s:Destroy() end)
 end
 
--- === UI helpers ===
-local function setCoreSafe(key, payload)
-    pcall(StarterGui.SetCore, StarterGui, key, payload)
+local function getRole(player)
+    local ok, role = pcall(function() return player:GetRoleInGroup(config.GroupId) end)
+    return ok and role or "Member"
 end
 
-local function toast(msg, dur)
-    setCoreSafe("SendNotification", { Title = "Staff Alert", Text = tostring(msg), Duration = dur or 3 })
+local function isStaff(player)
+    local ok, res = pcall(function() return player:IsInGroup(config.GroupId) end)
+    return ok and res
 end
 
--- === Group + thumbnail helpers ===
-local function safeIsInGroup(player, groupId)
-    local ok, result = pcall(function() return player:IsInGroup(groupId) end)
-    return ok and result
+local function isUndercover(player)
+    return UNDERCOVER_USERIDS[player.UserId] == true and not isStaff(player)
 end
 
-local function safeGetRoleInGroup(player, groupId)
-    local ok, role = pcall(function() return player:GetRoleInGroup(groupId) end)
-    if ok and type(role) == "string" and role ~= "" then
-        return role
-    end
-    return "Member"
-end
+-- ESP Folder Setup
+state.StaffESPFolder = CoreGui:FindFirstChild("StaffESP") or Instance.new("Folder", CoreGui)
+state.StaffESPFolder.Name = "StaffESP"
+state.UndercoverESPFolder = CoreGui:FindFirstChild("UndercoverStaffESP") or Instance.new("Folder", CoreGui)
+state.UndercoverESPFolder.Name = "UndercoverStaffESP"
 
-local function getHeadshot(userId)
-    local ok, content = pcall(function()
-        return Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
-    end)
-    return ok and content or "rbxassetid://15059364356"
-end
+local function applyESP(player)
+    if not player or not player.Parent then return end
+    local isS = isStaff(player)
+    local isU = isUndercover(player)
+    if not (isS or isU) then return end
 
--- === Notifications ===
-local function sendJoinNotiWithRole(player)
-    local role = safeGetRoleInGroup(player, GROUP_ID)
-    setCoreSafe("SendNotification", {
-        Title = player.DisplayName,
-        Text  = string.format("%s (%s) has joined the server.", player.Name, role),
-        Icon  = getHeadshot(player.UserId),
-        Duration = 5
-    })
-end
-
-local function sendLeaveNoti(player)
-    setCoreSafe("SendNotification", {
-        Title = player.DisplayName,
-        Text  = string.format("%s left the server", player.Name),
-        Icon  = getHeadshot(player.UserId),
-        Duration = 5
-    })
-end
-
-local function sendUndercoverNoti(player)
-    setCoreSafe("SendNotification", {
-        Title = player.DisplayName,
-        Text  = "CAUTION UNDERCOVER STAFF HAS JOINED THE SERVER",
-        Icon  = getHeadshot(player.UserId),
-        Duration = 6
-    })
-end
-
--- === ESP folders ===
-local StaffESPFolder = CoreGui:FindFirstChild("StaffESP") or Instance.new("Folder")
-StaffESPFolder.Name = "StaffESP"
-StaffESPFolder.Parent = CoreGui
-
-local UndercoverESPFolder = CoreGui:FindFirstChild("UndercoverStaffESP") or Instance.new("Folder")
-UndercoverESPFolder.Name = "UndercoverStaffESP"
-UndercoverESPFolder.Parent = CoreGui
-
-local espEnabled = true
-
-local function applyToggleToAll()
-    for _, folder in ipairs({StaffESPFolder, UndercoverESPFolder}) do
-        for _, obj in ipairs(folder:GetChildren()) do
-            if obj:IsA("Highlight") then obj.Enabled = espEnabled end
-        end
-    end
-    toast(("ESP: %s"):format(espEnabled and "ON" or "OFF"))
-end
-
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp or UserInputService:GetFocusedTextBox() then return end
-
-    if input.KeyCode == Enum.KeyCode.T then
-        espEnabled = not espEnabled
-        applyToggleToAll()
-
-    elseif input.KeyCode == Enum.KeyCode.F1 then
-        -- Show who is currently in the server:
-        -- - In-group staff
-        -- - Undercover watchlist users who are NOT in the group
-        local entries = {}
-
-        for _, plr in ipairs(Players:GetPlayers()) do
-            local inGroup = safeIsInGroup(plr, GROUP_ID)
-
-            if inGroup then
-                table.insert(entries, string.format("%s (@%s)", plr.DisplayName, plr.Name))
-            elseif isUndercoverWatched(plr.UserId) then
-                table.insert(entries, string.format("⚠ UNDERCOVER: %s (@%s)", plr.DisplayName, plr.Name))
-            end
-        end
-
-        if #entries == 0 then
-            toast("No Staff or Undercover users online.", 4)
-        else
-            local list = table.concat(entries, ", ")
-            if #list > 180 then list = list:sub(1, 177) .. "..." end
-            toast(string.format("Staff online (%d): %s", #entries, list), 6)
-        end
-    end
-end)
-
--- === Staff Highlight helpers (rainbow) ===
-local function staffHlKeyForPlayer(player) return "HL_" .. tostring(player.UserId) end
-
-local function getOrCreateStaffHighlightForPlayer(player)
-    local key = staffHlKeyForPlayer(player)
-    local hl = StaffESPFolder:FindFirstChild(key)
-    if not hl then
-        hl = Instance.new("Highlight")
+    local function attach(char)
+        if not char then return end
+        local key = (isS and "HL_" or "UHL_") .. player.UserId
+        local folder = isS and state.StaffESPFolder or state.UndercoverESPFolder
+        local hl = folder:FindFirstChild(key) or Instance.new("Highlight", folder)
         hl.Name = key
+        hl.Adornee = char
         hl.FillTransparency = 0.55
         hl.OutlineTransparency = 0.1
         hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.Parent = StaffESPFolder
+        hl.Enabled = config.StaffESPEnabled
+        if isU then
+            hl.FillColor = Color3.fromRGB(255, 0, 0)
+            hl.OutlineColor = Color3.fromRGB(255, 0, 0)
+        end
     end
-    hl.Enabled = espEnabled
-    return hl
-end
 
-local function attachStaffChar(player, char)
-    if not player or not char then return end
-    local hl = getOrCreateStaffHighlightForPlayer(player)
-    hl.Adornee = char
-    hl.Enabled = espEnabled
-    applySpecialTagOnce(char, player)
-end
-
-local function detachStaffChar(player)
-    if not player then return end
-    local hl = StaffESPFolder:FindFirstChild(staffHlKeyForPlayer(player))
-    if hl then hl.Adornee = nil end
-end
-
-local function applyESPIfStaff(player)
-    if not player or not player.Parent then return end
-    if not safeIsInGroup(player, GROUP_ID) then return end
-
-    sendJoinNotiWithRole(player)
-    getOrCreateStaffHighlightForPlayer(player)
-
-    if player.Character then
-        attachStaffChar(player, player.Character)
+    if isS then
+        notify(player.DisplayName, player.Name .. " (" .. getRole(player) .. ") joined.", 5)
+        playSound("rbxassetid://8887499160", 2)
+    elseif isU then
+        notify("⚠ UNDERCOVER STAFF", player.DisplayName .. " (@" .. player.Name .. ") is here!", 6, "warning")
+        playSound("rbxassetid://8887499160", 2)
     end
-    player.CharacterAdded:Connect(function(char)
-        attachStaffChar(player, char)
-    end)
-    player.CharacterRemoving:Connect(function(_) detachStaffChar(player) end)
+
+    if player.Character then attach(player.Character) end
+    player.CharacterAdded:Connect(attach)
 end
 
--- === Undercover Highlight helpers (RED) ===
-local function undercoverHlKeyForPlayer(player) return "UHL_" .. tostring(player.UserId) end
-
-local function getOrCreateUndercoverHighlightForPlayer(player)
-    local key = undercoverHlKeyForPlayer(player)
-    local hl = UndercoverESPFolder:FindFirstChild(key)
-    if not hl then
-        hl = Instance.new("Highlight")
-        hl.Name = key
-        hl.FillTransparency = 0.55
-        hl.OutlineTransparency = 0.1
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.FillColor = Color3.fromRGB(255, 0, 0)
-        hl.OutlineColor = Color3.fromRGB(255, 0, 0)
-        hl.Parent = UndercoverESPFolder
+local function onPlayerRemoving(player)
+    local isS = isStaff(player)
+    local isU = isUndercover(player)
+    
+    if isS or isU then
+        local tag = isS and "STAFF LEFT" or "UNDERCOVER LEFT"
+        notify(tag, player.DisplayName .. " has left the server.", 5, isU and "warning" or "success")
+        playSound("rbxassetid://1091083826", 2)
+        
+        -- Cleanup ESP
+        local key = (isS and "HL_" or "UHL_") .. player.UserId
+        local folder = isS and state.StaffESPFolder or state.UndercoverESPFolder
+        local hl = folder:FindFirstChild(key)
+        if hl then hl:Destroy() end
     end
-    hl.Enabled = espEnabled
-    return hl
 end
 
-local function attachUndercoverChar(player, char)
-    if not player or not char then return end
-    local hl = getOrCreateUndercoverHighlightForPlayer(player)
-    hl.Adornee = char
-    hl.Enabled = espEnabled
-    applySpecialTagOnce(char, player)
-end
-
-local function detachUndercoverChar(player)
-    if not player then return end
-    local hl = UndercoverESPFolder:FindFirstChild(undercoverHlKeyForPlayer(player))
-    if hl then hl.Adornee = nil end
-end
-
-local function applyESPIfUndercover(player)
-    if not player or not player.Parent then return end
-    if not isUndercoverWatched(player.UserId) then return end
-    if safeIsInGroup(player, GROUP_ID) then return end
-
-    sendUndercoverNoti(player)
-    getOrCreateUndercoverHighlightForPlayer(player)
-
-    if player.Character then
-        attachUndercoverChar(player, player.Character)
-    end
-    player.CharacterAdded:Connect(function(char)
-        attachUndercoverChar(player, char)
-    end)
-    player.CharacterRemoving:Connect(function(_) detachUndercoverChar(player) end)
-end
-
--- Rainbow colors for STAFF highlights only (do NOT affect undercover red)
+-- Rainbow loop for staff
 task.spawn(function()
     local hue = 0
     while true do
         hue = (hue + 0.01) % 1
         local color = Color3.fromHSV(hue, 1, 1)
-        for _, obj in ipairs(StaffESPFolder:GetChildren()) do
+        for _, obj in ipairs(state.StaffESPFolder:GetChildren()) do
             if obj:IsA("Highlight") then
                 obj.FillColor = color
                 obj.OutlineColor = color
@@ -360,246 +273,220 @@ task.spawn(function()
     end
 end)
 
--- Startup: quiet (no sounds for existing players)
-toast("Staff Alert started (T = toggle ESP, F1 = Current Staff)", 5)
+-- === UI IMPLEMENTATION ===
+local sg = Instance.new("ScreenGui", CoreGui.RobloxGui)
+sg.Name = ids.gui
+sg.ResetOnSpawn = false
 
-for _, plr in ipairs(Players:GetPlayers()) do
-    -- Special emoji tags apply regardless
-    if getSpecialEmoji(plr.UserId) then
-        startSpecialTagLoop(plr)
-        if plr.Character then applySpecialTagOnce(plr.Character, plr) end
-        plr.CharacterAdded:Connect(function(char) applySpecialTagOnce(char, plr) end)
-    end
+local main = Instance.new("Frame", sg)
+main.Name = ids.main
+main.BackgroundColor3 = theme.BackgroundPrimary
+main.Position = UDim2.new(0.5, -225, 0.5, -200)
+main.Size = UDim2.new(0, 450, 0, 400)
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 16)
+local mainStroke = Instance.new("UIStroke", main)
+mainStroke.Color = theme.AccentPrimary
+mainStroke.Thickness = 3
+mainStroke.Transparency = 0.2
+addGlow(main, theme.AccentPrimary, 0.7)
 
-    -- Real staff: notif + rainbow ESP
-    applyESPIfStaff(plr)
+-- Header
+local header = Instance.new("Frame", main)
+header.BackgroundColor3 = theme.BackgroundSecondary
+header.Size = UDim2.new(1, 0, 0, 60)
+Instance.new("UICorner", header).CornerRadius = UDim.new(0, 16)
+addGradient(header, theme.BackgroundSecondary, theme.BackgroundTertiary)
 
-    -- Undercover: CAUTION notif + red ESP
-    applyESPIfUndercover(plr)
-end
+local logo = Instance.new("Frame", header)
+logo.BackgroundColor3 = theme.AccentSecondary
+logo.Position = UDim2.new(0, 15, 0.5, -18)
+logo.Size = UDim2.new(0, 36, 0, 36)
+Instance.new("UICorner", logo).CornerRadius = UDim.new(0, 8)
+addGlow(logo, theme.AccentSecondary, 0.5)
 
--- Join logic:
--- 1) If undercover ID joins and NOT in group -> CAUTION + red ESP + SAME join sound
--- 2) If in group -> staff join message with role + rainbow ESP + join sound
-Players.PlayerAdded:Connect(function(plr)
-    -- Start special tag loop immediately if applicable
-    if getSpecialEmoji(plr.UserId) then
-        startSpecialTagLoop(plr)
-        if plr.Character then applySpecialTagOnce(plr.Character, plr) end
-        plr.CharacterAdded:Connect(function(char) applySpecialTagOnce(char, plr) end)
-    end
+local title = Instance.new("TextLabel", header)
+title.BackgroundTransparency = 1
+title.Position = UDim2.new(0, 58, 0, 10)
+title.Size = UDim2.new(0, 200, 0, 24)
+title.Font = Enum.Font.GothamBold
+title.Text = "STAFF ALERT"
+title.TextColor3 = theme.AccentSecondary
+title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
 
-    local inGroup = safeIsInGroup(plr, GROUP_ID)
+local sub = Instance.new("TextLabel", header)
+sub.BackgroundTransparency = 1
+sub.Position = UDim2.new(0, 58, 0, 36)
+sub.Size = UDim2.new(0, 200, 0, 16)
+sub.Font = Enum.Font.Gotham
+sub.Text = "v1.1.5 | This menu is so sexyyyyy"
+sub.TextColor3 = theme.TextSecondary
+sub.TextSize = 15
+sub.TextXAlignment = Enum.TextXAlignment.Left
 
-    if isUndercoverWatched(plr.UserId) and not inGroup then
-        playOnce(JOIN_SOUND_ID, JOIN_VOLUME) -- same as normal
-        applyESPIfUndercover(plr)
-        return
-    end
+-- Content
+local content = Instance.new("ScrollingFrame", main)
+content.BackgroundTransparency = 1
+content.Position = UDim2.new(0, 15, 0, 75)
+content.Size = UDim2.new(1, -30, 1, -90)
+content.CanvasSize = UDim2.new(0, 0, 0, 500)
+content.ScrollBarThickness = 0
 
-    if inGroup then
-        playOnce(JOIN_SOUND_ID, JOIN_VOLUME)
-        applyESPIfStaff(plr)
-    end
-end)
+local function createToggle(name, desc, yPos, initialValue, callback)
+    local f = Instance.new("Frame", content)
+    f.BackgroundColor3 = theme.BackgroundSecondary
+    f.Position = UDim2.new(0, 0, 0, yPos)
+    f.Size = UDim2.new(1, 0, 0, 55)
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
+    local s = Instance.new("UIStroke", f)
+    s.Color = theme.AccentSecondary
+    s.Thickness = 2
+    s.Transparency = initialValue and 0.2 or 0.8
 
--- Leave: keep original behavior (leave sound + leave noti only for in-group)
-Players.PlayerRemoving:Connect(function(plr)
-    if safeIsInGroup(plr, GROUP_ID) then
-        sendLeaveNoti(plr)
-        playOnce(LEAVE_SOUND_ID, LEAVE_VOLUME)
-    end
-    detachStaffChar(plr)
-    detachUndercoverChar(plr)
-    stopSpecialTagLoop(plr)
-end)
+    local tl = Instance.new("TextLabel", f)
+    tl.BackgroundTransparency = 1
+    tl.Position = UDim2.new(0, 14, 0, 8)
+    tl.Size = UDim2.new(1, -100, 0, 18)
+    tl.Font = Enum.Font.GothamBold
+    tl.Text = name
+    tl.TextColor3 = theme.TextPrimary
+    tl.TextSize = 13
+    tl.TextXAlignment = Enum.TextXAlignment.Left
 
-do
-    local TextChatService = game:GetService("TextChatService")
-    local Lighting = game:GetService("Lighting")
-    local RunService = game:GetService("RunService")
-    local Players2 = game:GetService("Players")
-    local SoundService2 = game:GetService("SoundService")
+    local dl = Instance.new("TextLabel", f)
+    dl.BackgroundTransparency = 1
+    dl.Position = UDim2.new(0, 14, 0, 28)
+    dl.Size = UDim2.new(1, -100, 0, 20)
+    dl.Font = Enum.Font.Gotham
+    dl.Text = desc
+    dl.TextColor3 = theme.TextSecondary
+    dl.TextSize = 12
+    dl.TextXAlignment = Enum.TextXAlignment.Left
 
-    local localPlayer = Players2.LocalPlayer
+    local bg = Instance.new("Frame", f)
+    bg.BackgroundColor3 = initialValue and theme.AccentPrimary or theme.BackgroundTertiary
+    bg.Position = UDim2.new(1, -62, 0.5, -14)
+    bg.Size = UDim2.new(0, 52, 0, 28)
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(1, 0)
 
-    -- Sound asset
-    local JUJU_SOUND_ID = "rbxassetid://103606830325471"
-    local JUJU_TARGET_VOLUME = 4
-    local JUJU_START_TIME = 13
+    local btn = Instance.new("Frame", bg)
+    btn.BackgroundColor3 = theme.TextPrimary
+    btn.Position = initialValue and UDim2.new(1, -25, 0.5, -11) or UDim2.new(0, 3, 0.5, -11)
+    btn.Size = UDim2.new(0, 22, 0, 22)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+    addGlow(btn, theme.TextPrimary, 0.6)
 
-    -- Fade settings (sound)
-    local JUJU_FADE_TIME = 3
-    local JUJU_FADE_STEPS = 20
-
-    -- Disco settings (Lighting-only “screen effects”)
-    local JUJU_DISCO_SPEED = 0.25
-    local JUJU_DISCO_FADE_TIME = 1.0
-
-    local currentSound = nil
-    local busy = false
-
-    local discoOn = false
-    local discoConn = nil
-    local discoFadeTweening = false
-
-    local original = {
-        Ambient = Lighting.Ambient,
-        OutdoorAmbient = Lighting.OutdoorAmbient,
-        ColorShift_Top = Lighting.ColorShift_Top,
-        ColorShift_Bottom = Lighting.ColorShift_Bottom,
-        Brightness = Lighting.Brightness,
-    }
-
-    local function fadeVolume(sound, fromVol, toVol)
-        if not sound then return end
-        for i = 1, JUJU_FADE_STEPS do
-            if not sound or not sound.Parent then return end
-            local alpha = i / JUJU_FADE_STEPS
-            sound.Volume = fromVol + (toVol - fromVol) * alpha
-            task.wait(JUJU_FADE_TIME / JUJU_FADE_STEPS)
-        end
-    end
-
-    local function lerpColor(a, b, t)
-        return Color3.new(
-            a.R + (b.R - a.R) * t,
-            a.G + (b.G - a.G) * t,
-            a.B + (b.B - a.B) * t
-        )
-    end
-
-    local function lerpNumber(a, b, t)
-        return a + (b - a) * t
-    end
-
-    local function fadeLightingTo(target, duration)
-        if discoFadeTweening then return end
-        discoFadeTweening = true
-
-        local start = {
-            Ambient = Lighting.Ambient,
-            OutdoorAmbient = Lighting.OutdoorAmbient,
-            ColorShift_Top = Lighting.ColorShift_Top,
-            ColorShift_Bottom = Lighting.ColorShift_Bottom,
-            Brightness = Lighting.Brightness,
-        }
-
-        local t0 = os.clock()
-        while true do
-            local t = (os.clock() - t0) / duration
-            if t >= 1 then t = 1 end
-
-            Lighting.Ambient = lerpColor(start.Ambient, target.Ambient, t)
-            Lighting.OutdoorAmbient = lerpColor(start.OutdoorAmbient, target.OutdoorAmbient, t)
-            Lighting.ColorShift_Top = lerpColor(start.ColorShift_Top, target.ColorShift_Top, t)
-            Lighting.ColorShift_Bottom = lerpColor(start.ColorShift_Bottom, target.ColorShift_Bottom, t)
-            Lighting.Brightness = lerpNumber(start.Brightness, target.Brightness, t)
-
-            if t >= 1 then break end
-            task.wait()
-        end
-
-        discoFadeTweening = false
-    end
-
-    local function stopDisco()
-        discoOn = false
-        if discoConn then
-            discoConn:Disconnect()
-            discoConn = nil
-        end
-
-        task.spawn(function()
-            fadeLightingTo(original, JUJU_DISCO_FADE_TIME)
-        end)
-    end
-
-    local function startDisco()
-        if discoOn then return end
-        discoOn = true
-
-        task.spawn(function()
-            fadeLightingTo({
-                Ambient = original.Ambient,
-                OutdoorAmbient = original.OutdoorAmbient,
-                ColorShift_Top = original.ColorShift_Top,
-                ColorShift_Bottom = original.ColorShift_Bottom,
-                Brightness = math.max(original.Brightness, 2),
-            }, JUJU_DISCO_FADE_TIME)
-        end)
-
-        local hue = 0
-        discoConn = RunService.RenderStepped:Connect(function(dt)
-            if not discoOn then return end
-            hue = (hue + dt * JUJU_DISCO_SPEED) % 1
-            local c = Color3.fromHSV(hue, 1, 1)
-
-            Lighting.Ambient = c
-            Lighting.OutdoorAmbient = c
-            Lighting.ColorShift_Top = c
-            Lighting.ColorShift_Bottom = c
-        end)
-    end
-
-    local function stopSound()
-        if currentSound then
-            local s = currentSound
-            currentSound = nil
-
-            fadeVolume(s, s.Volume, 0)
-            s:Stop()
-            s:Destroy()
-        end
-    end
-
-    local function playSound()
-        stopSound()
-
-        local s = Instance.new("Sound")
-        s.SoundId = JUJU_SOUND_ID
-        s.Volume = 0
-        s.Parent = SoundService2
-
-        s.TimePosition = JUJU_START_TIME
-
-        currentSound = s
-        s:Play()
-
-        fadeVolume(s, 0, JUJU_TARGET_VOLUME)
-
-        s.Ended:Connect(function()
-            if currentSound == s then
-                currentSound = nil
-            end
-            s:Destroy()
-            stopDisco()
-        end)
-    end
-
-    local function toggleParty()
-        if busy then return end
-        busy = true
-
-        if currentSound and currentSound.IsPlaying then
-            stopSound()
-            stopDisco()
+    local val = initialValue
+    local click = Instance.new("TextButton", f)
+    click.BackgroundTransparency = 1
+    click.Size = UDim2.new(1, 0, 1, 0)
+    click.Text = ""
+    
+    click.MouseButton1Click:Connect(function()
+        val = not val
+        callback(val)
+        if val then
+            tween(btn, {Position = UDim2.new(1, -25, 0.5, -11)}, 0.3, Enum.EasingStyle.Back)
+            tween(bg, {BackgroundColor3 = theme.AccentPrimary}, 0.3)
+            tween(s, {Transparency = 0.2}, 0.3)
         else
-            startDisco()
-            playSound()
-        end
-
-        task.delay(0.2, function()
-            busy = false
-        end)
-    end
-
-    TextChatService.MessageReceived:Connect(function(message)
-        if message.TextSource and message.TextSource.UserId == localPlayer.UserId then
-            local text = string.lower(message.Text):gsub("^%s*(.-)%s*$", "%1")
-            if text == "juju" then
-                toggleParty()
-            end
+            tween(btn, {Position = UDim2.new(0, 3, 0.5, -11)}, 0.3, Enum.EasingStyle.Back)
+            tween(bg, {BackgroundColor3 = theme.BackgroundTertiary}, 0.3)
+            tween(s, {Transparency = 0.8}, 0.3)
         end
     end)
 end
+
+-- Sections
+local l1 = Instance.new("TextLabel", content)
+l1.BackgroundTransparency = 1
+l1.Size = UDim2.new(1, 0, 0, 25)
+l1.Font = Enum.Font.GothamBold
+l1.Text = "STAFF ALERT SETTINGS"
+l1.TextColor3 = theme.AccentSecondary
+l1.TextSize = 14
+l1.TextXAlignment = Enum.TextXAlignment.Left
+
+createToggle("Staff ESP", "Highlights staff members through walls", 30, config.StaffESPEnabled, function(v)
+    config.StaffESPEnabled = v
+    for _, f in ipairs({state.StaffESPFolder, state.UndercoverESPFolder}) do
+        for _, h in ipairs(f:GetChildren()) do if h:IsA("Highlight") then h.Enabled = v end end
+    end
+end)
+
+createToggle("Notifications", "Receive alerts for staff members", 90, config.NotificationsEnabled, function(v)
+    config.NotificationsEnabled = v
+end)
+
+createToggle("Alert Sounds", "Play sound effect for staff members", 150, config.SoundsEnabled, function(v)
+    config.SoundsEnabled = v
+end)
+
+-- Update Log Section
+local l2 = Instance.new("TextLabel", content)
+l2.BackgroundTransparency = 1
+l2.Position = UDim2.new(0, 0, 0, 220)
+l2.Size = UDim2.new(1, 0, 0, 25)
+l2.Font = Enum.Font.GothamBold
+l2.Text = "IMPORTANT CHANGES"
+l2.TextColor3 = theme.AccentSecondary
+l2.TextSize = 14
+l2.TextXAlignment = Enum.TextXAlignment.Left
+
+local updateFrame = Instance.new("Frame", content)
+updateFrame.BackgroundColor3 = theme.BackgroundSecondary
+updateFrame.Position = UDim2.new(0, 0, 0, 250)
+updateFrame.Size = UDim2.new(1, 0, 0, 130)
+Instance.new("UICorner", updateFrame).CornerRadius = UDim.new(0, 12)
+
+local updateText = Instance.new("TextLabel", updateFrame)
+updateText.BackgroundTransparency = 1
+updateText.Position = UDim2.new(0, 10, 0, 10)
+updateText.Size = UDim2.new(1, -20, 1, -20)
+updateText.Font = Enum.Font.Gotham
+updateText.Text = "• Updated staff group ID\n• Added staff alert toggles\n• Staff group + undercover staff are not 100% accurate yet\n• Use at own risk"
+updateText.TextColor3 = theme.TextSecondary
+updateText.TextSize = 12
+updateText.TextXAlignment = Enum.TextXAlignment.Left
+updateText.TextYAlignment = Enum.TextYAlignment.Top
+
+-- Dragging logic
+local dragging, dragInput, dragStart, startPos
+main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+    end
+end)
+main.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+-- Toggle Menu visibility
+main.Visible = state.Visible
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == theme.ToggleKey then
+        state.Visible = not state.Visible
+        main.Visible = state.Visible
+    end
+end)
+
+-- Init
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= localPlayer then applyESP(p) end
+end
+Players.PlayerAdded:Connect(applyESP)
+Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+notify("STAFF ALERT LOADED", "Right Control to toggle menu", 5, "success")
