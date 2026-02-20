@@ -444,7 +444,7 @@ updateText.BackgroundTransparency = 1
 updateText.Position = UDim2.new(0, 10, 0, 10)
 updateText.Size = UDim2.new(1, -20, 1, -20)
 updateText.Font = Enum.Font.Gotham
-updateText.Text = "• Updated staff group\n• Added new undercover mods\n• Remade the whole menu + added staff alert settings\n• The staff alert is not as accurate yet due to the termination of the previous group\n• Use at own risk!!"
+updateText.Text = "• Alert is not accurate anymore, due to no group yet\n• Added new undercover mods\n• Remade the whole menu + added staff alert settings\n• The staff alert is not as accurate yet due to the termination of the previous group\n• Use at own risk!!"
 updateText.TextColor3 = theme.TextSecondary
 updateText.TextSize = 12
 updateText.TextXAlignment = Enum.TextXAlignment.Left
@@ -490,5 +490,6 @@ Players.PlayerAdded:Connect(applyESP)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 notify("STAFF ALERT STARTED", "Right Control to toggle menu", 5, "success")
+
 
 
