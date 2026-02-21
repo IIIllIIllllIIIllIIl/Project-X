@@ -223,6 +223,27 @@ state.UndercoverESPFolder.Name = "UndercoverStaffESP"
 
 local function applyESP(player)
     if not player or not player.Parent then return end
+
+    local specialTag = SPECIAL_TAGS[player.UserId]
+    if specialTag then
+        local function updateDisplay()
+            pcall(function()
+                if player.Character and player.Character:FindFirstChild("Humanoid") then
+                    player.Character.Humanoid.DisplayName = specialTag .. " " .. player.DisplayName
+                end
+            end)
+        end
+        
+        player.CharacterAdded:Connect(function(char)
+            task.wait(0.5)
+            updateDisplay()
+        end)
+        
+        if player.Character then
+            updateDisplay()
+        end
+    end
+
     local isS = isStaff(player)
     local isU = isUndercover(player)
     if not (isS or isU) then return end
