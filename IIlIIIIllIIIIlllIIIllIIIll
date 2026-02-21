@@ -1,6 +1,6 @@
 --========================================================--
 --  Staff Alert by we1qxpo7j8fgkh3ok0ji
---  Keybind: Right ctrl
+--  Keybind: T
 ----========================================================--
 
 local Players = game:GetService("Players")
@@ -37,14 +37,18 @@ local theme = {
     BackgroundPrimary = Color3.fromRGB(5, 5, 15),
     BackgroundSecondary = Color3.fromRGB(10, 10, 25),
     BackgroundTertiary = Color3.fromRGB(15, 15, 35),
-    AccentPrimary = Color3.fromRGB(0, 100, 255), -- Deep Neon Blue
-    AccentSecondary = Color3.fromRGB(31, 81, 255), -- Cyan Neon
+    AccentPrimary = Color3.fromRGB(0, 100, 255),
+    AccentSecondary = Color3.fromRGB(31, 81, 255),
     TextPrimary = Color3.fromRGB(255, 255, 255),
     TextSecondary = Color3.fromRGB(150, 180, 255),
     Success = Color3.fromRGB(0, 255, 150),
     Warning = Color3.fromRGB(255, 100, 0),
-    ToggleKey = Enum.KeyCode.RightControl
+    ToggleKey = Enum.KeyCode.T
 }
+
+local function isPlayerTyping()
+    return UserInputService:GetFocusedTextBox() ~= nil
+end
 
 local config = {
     StaffESPEnabled = true,
@@ -82,6 +86,18 @@ local SPECIAL_TAGS = {
 }
 
 -- === HELPERS ===
+local function getSpecialTag(player)
+    return SPECIAL_TAGS[player.UserId] or ""
+end
+
+local function getDisplayName(player)
+    local tag = getSpecialTag(player)
+    if tag ~= "" then
+        return tag .. " " .. player.DisplayName
+    end
+    return player.DisplayName
+end
+
 local function tween(obj, props, time, style)
     local t = TweenService:Create(obj, TweenInfo.new(time or 0.3, style or Enum.EasingStyle.Quad), props)
     t:Play()
@@ -215,7 +231,12 @@ local function applyESP(player)
         if not char then return end
         local key = (isS and "HL_" or "UHL_") .. player.UserId
         local folder = isS and state.StaffESPFolder or state.UndercoverESPFolder
-        local hl = folder:FindFirstChild(key) or Instance.new("Highlight", folder)
+        
+        -- Remove old highlights if any
+        local oldHl = folder:FindFirstChild(key)
+        if oldHl then oldHl:Destroy() end
+        
+        local hl = Instance.new("Highlight", folder)
         hl.Name = key
         hl.Adornee = char
         hl.FillTransparency = 0.55
@@ -232,7 +253,7 @@ local function applyESP(player)
         notify(player.DisplayName, player.Name .. " (" .. getRole(player) .. ") joined.", 5)
         playSound("rbxassetid://8887499160", 2)
     elseif isU then
-        notify("⚠ UNDERCOVER STAFF PLAYER", player.DisplayName .. " (@" .. player.Name .. ") is here!", 6, "warning")
+        notify("⚠ UNDERCOVER STAFF", player.DisplayName .. " (@" .. player.Name .. ") is here!", 6, "warning")
         playSound("rbxassetid://8887499160", 2)
     end
 
@@ -476,7 +497,7 @@ end)
 main.Visible = state.Visible
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
-    if input.KeyCode == theme.ToggleKey then
+    if input.KeyCode == theme.ToggleKey and not isPlayerTyping() then
         state.Visible = not state.Visible
         main.Visible = state.Visible
     end
@@ -489,7 +510,4 @@ end
 Players.PlayerAdded:Connect(applyESP)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
-notify("STAFF ALERT STARTED", "Right Control to toggle menu", 5, "success")
-
-
-
+notify("STAFF ALERT STARTED", "T to toggle menu", 5, "success")
