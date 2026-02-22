@@ -54,7 +54,7 @@ local config = {
     StaffESPEnabled = true,
     NotificationsEnabled = true,
     SoundsEnabled = true,
-    GroupId = 866697749
+    GroupId = 74945263
 }
 
 local state = {
@@ -533,3 +533,4 @@ Players.PlayerAdded:Connect(applyESP)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 notify("STAFF ALERT STARTED", "T to toggle menu", 5, "success")
+
