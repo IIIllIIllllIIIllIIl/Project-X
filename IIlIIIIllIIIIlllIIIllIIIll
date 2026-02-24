@@ -362,7 +362,7 @@ sub.BackgroundTransparency = 1
 sub.Position = UDim2.new(0, 58, 0, 36)
 sub.Size = UDim2.new(0, 200, 0, 16)
 sub.Font = Enum.Font.Gotham
-sub.Text = "v1.1.5 | This menu is so sexyyyyy"
+sub.Text = "v1.1.5 | STAFF ALERT NOT UP TO DATE DUE REMOVED GROUP"
 sub.TextColor3 = theme.TextSecondary
 sub.TextSize = 13
 sub.TextXAlignment = Enum.TextXAlignment.Left
@@ -533,4 +533,5 @@ Players.PlayerAdded:Connect(applyESP)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 notify("STAFF ALERT STARTED", "T to toggle menu", 5, "success")
+
 
