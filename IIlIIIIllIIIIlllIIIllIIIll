@@ -76,7 +76,7 @@ local UNDERCOVER_USERIDS = {
     [3270461823] = true, [3740191158] = true, [1617828795] = true, [1987394728] = true, [43829894] = true,
     [3889850179] = true, [5003063221] = true, [32435725] = true, [10539855360] = true, [1236712946] = true,
     [1572762983] = true, [5644420194] = true, [14100504] = true, [1094365126] = true, [461435528] = true,
-    [4138598689] = true, [3812472402] = true, [10418656725] = true, [2309457259] = true, [9821294795] = true, [10423842558] = true,
+    [4138598689] = true, [3812472402] = true, [10418656725] = true, [2707323976] = true, [9821294795] = true, [10423842558] = true,
     [4559062275] = true, [2912939789] = true
 }
 
@@ -533,6 +533,7 @@ Players.PlayerAdded:Connect(applyESP)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 notify("STAFF ALERT STARTED", "T to toggle menu", 5, "success")
+
 
 
 
