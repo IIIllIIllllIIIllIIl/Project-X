@@ -324,8 +324,8 @@ sg.ResetOnSpawn = false
 local main = Instance.new("Frame", sg)
 main.Name = ids.main
 main.BackgroundColor3 = theme.BackgroundPrimary
-main.Position = UDim2.new(0.5, -225, 0.5, -200)
-main.Size = UDim2.new(0, 450, 0, 400)
+main.Position = UDim2.new(0.5, -250, 0.5, -200)
+main.Size = UDim2.new(0, 500, 0, 400)
 Instance.new("UICorner", main).CornerRadius = UDim.new(0, 16)
 local mainStroke = Instance.new("UIStroke", main)
 mainStroke.Color = theme.AccentPrimary
@@ -333,50 +333,94 @@ mainStroke.Thickness = 3
 mainStroke.Transparency = 0.2
 addGlow(main, theme.AccentPrimary, 0.7)
 
--- Header
-local header = Instance.new("Frame", main)
-header.BackgroundColor3 = theme.BackgroundSecondary
-header.Size = UDim2.new(1, 0, 0, 60)
-Instance.new("UICorner", header).CornerRadius = UDim.new(0, 16)
-addGradient(header, theme.BackgroundSecondary, theme.BackgroundTertiary)
+-- Sidebar
+local sidebar = Instance.new("Frame", main)
+sidebar.BackgroundColor3 = theme.BackgroundSecondary
+sidebar.Size = UDim2.new(0, 150, 1, 0)
+Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 16)
+addGradient(sidebar, theme.BackgroundSecondary, theme.BackgroundTertiary)
 
-local logo = Instance.new("Frame", header)
-logo.BackgroundColor3 = theme.AccentSecondary
-logo.Position = UDim2.new(0, 15, 0.5, -18)
-logo.Size = UDim2.new(0, 36, 0, 36)
-Instance.new("UICorner", logo).CornerRadius = UDim.new(0, 8)
-addGlow(logo, theme.AccentSecondary, 0.5)
+local sideLogo = Instance.new("Frame", sidebar)
+sideLogo.BackgroundColor3 = theme.AccentSecondary
+sideLogo.Position = UDim2.new(0, 15, 0, 15)
+sideLogo.Size = UDim2.new(0, 30, 0, 30)
+Instance.new("UICorner", sideLogo).CornerRadius = UDim.new(0, 6)
 
-local title = Instance.new("TextLabel", header)
-title.BackgroundTransparency = 1
-title.Position = UDim2.new(0, 58, 0, 10)
-title.Size = UDim2.new(0, 200, 0, 24)
-title.Font = Enum.Font.GothamBold
-title.Text = "STAFF ALERT"
-title.TextColor3 = theme.AccentSecondary
-title.TextSize = 18
-title.TextXAlignment = Enum.TextXAlignment.Left
+local sideTitle = Instance.new("TextLabel", sidebar)
+sideTitle.BackgroundTransparency = 1
+sideTitle.Position = UDim2.new(0, 55, 0, 15)
+sideTitle.Size = UDim2.new(0, 80, 0, 30)
+sideTitle.Font = Enum.Font.GothamBold
+sideTitle.Text = "STAFF"
+sideTitle.TextColor3 = theme.TextPrimary
+sideTitle.TextSize = 14
+sideTitle.TextXAlignment = Enum.TextXAlignment.Left
 
-local sub = Instance.new("TextLabel", header)
-sub.BackgroundTransparency = 1
-sub.Position = UDim2.new(0, 58, 0, 36)
-sub.Size = UDim2.new(0, 200, 0, 16)
-sub.Font = Enum.Font.Gotham
-sub.Text = "v1.1.5 | STAFF ALERT UPDATED 25-02-2026"
-sub.TextColor3 = theme.TextSecondary
-sub.TextSize = 13
-sub.TextXAlignment = Enum.TextXAlignment.Left
+local nav = Instance.new("Frame", sidebar)
+nav.BackgroundTransparency = 1
+nav.Position = UDim2.new(0, 0, 0, 60)
+nav.Size = UDim2.new(1, 0, 1, -60)
 
--- Content
-local content = Instance.new("ScrollingFrame", main)
-content.BackgroundTransparency = 1
-content.Position = UDim2.new(0, 15, 0, 75)
-content.Size = UDim2.new(1, -30, 1, -90)
-content.CanvasSize = UDim2.new(0, 0, 0, 500)
-content.ScrollBarThickness = 0
+local pages = Instance.new("Frame", main)
+pages.BackgroundTransparency = 1
+pages.Position = UDim2.new(0, 150, 0, 0)
+pages.Size = UDim2.new(1, -150, 1, 0)
 
-local function createToggle(name, desc, yPos, initialValue, callback)
-    local f = Instance.new("Frame", content)
+local function createPage(name)
+    local p = Instance.new("ScrollingFrame", pages)
+    p.Name = name
+    p.BackgroundTransparency = 1
+    p.Position = UDim2.new(0, 15, 0, 20)
+    p.Size = UDim2.new(1, -30, 1, -40)
+    p.CanvasSize = UDim2.new(0, 0, 0, 500)
+    p.ScrollBarThickness = 0
+    p.Visible = false
+    return p
+end
+
+local staffPage = createPage("Staff")
+local infoPage = createPage("Information")
+local targetPage = createPage("Target")
+
+local currentPage = staffPage
+currentPage.Visible = true
+
+local function navBtn(name, page, y)
+    local b = Instance.new("TextButton", nav)
+    b.BackgroundColor3 = theme.BackgroundTertiary
+    b.BackgroundTransparency = 0.8
+    b.Position = UDim2.new(0, 10, 0, y)
+    b.Size = UDim2.new(1, -20, 0, 35)
+    b.Font = Enum.Font.GothamMedium
+    b.Text = name
+    b.TextColor3 = theme.TextSecondary
+    b.TextSize = 12
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    
+    local s = Instance.new("UIStroke", b)
+    s.Color = theme.AccentSecondary
+    s.Thickness = 1
+    s.Enabled = (page == currentPage)
+
+    b.MouseButton1Click:Connect(function()
+        currentPage.Visible = false
+        for _, child in ipairs(nav:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:FindFirstChildOfClass("UIStroke").Enabled = false
+            end
+        end
+        currentPage = page
+        currentPage.Visible = true
+        s.Enabled = true
+    end)
+end
+
+navBtn("Info / Updates", infoPage, 0)
+navBtn("Staff Alerts", staffPage, 45)
+navBtn("Target / View", targetPage, 90)
+
+local function createToggle(name, desc, yPos, initialValue, callback, parent)
+    local f = Instance.new("Frame", parent or staffPage)
     f.BackgroundColor3 = theme.BackgroundSecondary
     f.Position = UDim2.new(0, 0, 0, yPos)
     f.Size = UDim2.new(1, 0, 0, 55)
@@ -440,8 +484,169 @@ local function createToggle(name, desc, yPos, initialValue, callback)
     end)
 end
 
--- Sections
-local l1 = Instance.new("TextLabel", content)
+-- Populate Info Page
+local it = Instance.new("TextLabel", infoPage)
+it.BackgroundTransparency = 1
+it.Size = UDim2.new(1, 0, 0, 30)
+it.Font = Enum.Font.GothamBold
+it.Text = "UPDATES & CHANGES"
+it.TextColor3 = theme.AccentSecondary
+it.TextSize = 14
+it.TextXAlignment = Enum.TextXAlignment.Left
+
+local ifr = Instance.new("Frame", infoPage)
+ifr.BackgroundColor3 = theme.BackgroundSecondary
+ifr.Position = UDim2.new(0, 0, 0, 40)
+ifr.Size = UDim2.new(1, 0, 0, 150)
+Instance.new("UICorner", ifr).CornerRadius = UDim.new(0, 12)
+
+local il = Instance.new("TextLabel", ifr)
+il.BackgroundTransparency = 1
+il.Position = UDim2.new(0, 15, 0, 15)
+il.Size = UDim2.new(1, -30, 1, -30)
+il.Font = Enum.Font.Gotham
+il.Text = "• Staff group added again\n• Added new undercover mods\n• Remade the whole menu + added submenus\n• Undercover staff will be updated soon\n• Use at own risk!!"
+il.TextColor3 = theme.TextSecondary
+il.TextSize = 12
+il.TextXAlignment = Enum.TextXAlignment.Left
+il.TextYAlignment = Enum.TextYAlignment.Top
+
+-- Populate Target Page
+local tt = Instance.new("TextLabel", targetPage)
+tt.BackgroundTransparency = 1
+tt.Size = UDim2.new(1, 0, 0, 30)
+tt.Font = Enum.Font.GothamBold
+tt.Text = "PLAYER TARGETING"
+tt.TextColor3 = theme.AccentSecondary
+tt.TextSize = 14
+tt.TextXAlignment = Enum.TextXAlignment.Left
+
+local input = Instance.new("TextBox", targetPage)
+input.BackgroundColor3 = theme.BackgroundTertiary
+input.Position = UDim2.new(0, 0, 0, 40)
+input.Size = UDim2.new(1, 0, 0, 45)
+input.Font = Enum.Font.GothamMedium
+input.PlaceholderText = "Type Username or Display Name..."
+input.Text = ""
+input.TextColor3 = theme.TextPrimary
+input.TextSize = 14
+input.ClearTextOnFocus = false
+Instance.new("UICorner", input).CornerRadius = UDim.new(0, 10)
+local inputStroke = Instance.new("UIStroke", input)
+inputStroke.Color = theme.AccentSecondary
+inputStroke.Thickness = 2
+
+local suggestion = Instance.new("TextLabel", input)
+suggestion.BackgroundTransparency = 1
+suggestion.Position = UDim2.new(0, 14, 0, 0)
+suggestion.Size = UDim2.new(1, -28, 1, 0)
+suggestion.Font = Enum.Font.GothamMedium
+suggestion.Text = ""
+suggestion.TextColor3 = theme.TextSecondary
+suggestion.TextTransparency = 0.5
+suggestion.TextSize = 14
+suggestion.TextXAlignment = Enum.TextXAlignment.Left
+suggestion.ZIndex = input.ZIndex - 1
+
+local function getBestMatch(txt)
+    if txt == "" then return nil end
+    txt = txt:lower()
+    local matches = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Name:lower():sub(1, #txt) == txt or p.DisplayName:lower():sub(1, #txt) == txt then
+            table.insert(matches, p)
+        end
+    end
+    
+    if #matches == 0 then return nil end
+    
+    -- Priority: Exact match first
+    for _, p in ipairs(matches) do
+        if p.Name:lower() == txt or p.DisplayName:lower() == txt then
+            return p
+        end
+    end
+    
+    -- If multiple matches, don't auto-suggest if it's ambiguous (like edd for eddie vs edda)
+    -- Unless one is a significantly better match (shorter name)
+    if #matches > 1 then
+        table.sort(matches, function(a, b) return #a.Name < #b.Name end)
+        if #matches[1].Name == #matches[2].Name then
+            return nil -- Ambiguous
+        end
+    end
+    
+    return matches[1]
+end
+
+input:GetPropertyChangedSignal("Text"):Connect(function()
+    local txt = input.Text
+    local match = getBestMatch(txt)
+    if match and txt ~= "" then
+        local name = match.Name
+        if name:lower():sub(1, #txt) == txt:lower() then
+            suggestion.Text = txt .. name:sub(#txt + 1)
+        else
+            suggestion.Text = txt .. " (" .. match.DisplayName .. ")"
+        end
+    else
+        suggestion.Text = ""
+    end
+end)
+
+input.FocusLost:Connect(function(enter)
+    if enter then
+        local match = getBestMatch(input.Text)
+        if match then
+            input.Text = match.Name
+            suggestion.Text = ""
+        end
+    end
+end)
+
+local spectating = false
+local spectateConn
+createToggle("Spectate View", "View target's perspective (Stays on after death)", 100, false, function(v)
+    if v then
+        local target = getBestMatch(input.Text)
+        if target and target ~= localPlayer then
+            input.Text = target.Name
+            suggestion.Text = ""
+            
+            local function updateCamera()
+                if target.Character and target.Character:FindFirstChildOfClass("Humanoid") then
+                    Workspace.CurrentCamera.CameraSubject = target.Character:FindFirstChildOfClass("Humanoid")
+                end
+            end
+            
+            if spectateConn then spectateConn:Disconnect() end
+            spectateConn = RunService.RenderStepped:Connect(function()
+                if spectating and target.Parent then
+                    updateCamera()
+                elseif not target.Parent then
+                    v = false
+                    -- Toggle UI would need to be updated here if we had a ref to the toggle state
+                end
+            end)
+            
+            spectating = true
+            notify("SPECTATING", "Viewing " .. target.DisplayName, 3, "success")
+        else
+            spectating = false
+            notify("ERROR", target == localPlayer and "Cannot spectate self" or "Player not found", 3, "warning")
+            -- Reset toggle logic here
+        end
+    else
+        spectating = false
+        if spectateConn then spectateConn:Disconnect() end
+        if localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            Workspace.CurrentCamera.CameraSubject = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+        end
+    end
+end, targetPage)
+
+-- Staff Settings
+local l1 = Instance.new("TextLabel", staffPage)
 l1.BackgroundTransparency = 1
 l1.Size = UDim2.new(1, 0, 0, 25)
 l1.Font = Enum.Font.GothamBold
@@ -455,43 +660,15 @@ createToggle("Staff ESP", "Highlights staff members through walls", 30, config.S
     for _, f in ipairs({state.StaffESPFolder, state.UndercoverESPFolder}) do
         for _, h in ipairs(f:GetChildren()) do if h:IsA("Highlight") then h.Enabled = v end end
     end
-end)
+end, staffPage)
 
 createToggle("Staff Notification Alerts", "Receive notification alerts for staff members", 90, config.NotificationsEnabled, function(v)
     config.NotificationsEnabled = v
-end)
+end, staffPage)
 
 createToggle("Staff Sound Alerts", "Receive sound alerts for staff members", 150, config.SoundsEnabled, function(v)
     config.SoundsEnabled = v
-end)
-
--- Update Log Section
-local l2 = Instance.new("TextLabel", content)
-l2.BackgroundTransparency = 1
-l2.Position = UDim2.new(0, 0, 0, 220)
-l2.Size = UDim2.new(1, 0, 0, 25)
-l2.Font = Enum.Font.GothamBold
-l2.Text = "Updates & Changes"
-l2.TextColor3 = theme.AccentSecondary
-l2.TextSize = 14
-l2.TextXAlignment = Enum.TextXAlignment.Left
-
-local updateFrame = Instance.new("Frame", content)
-updateFrame.BackgroundColor3 = theme.BackgroundSecondary
-updateFrame.Position = UDim2.new(0, 0, 0, 250)
-updateFrame.Size = UDim2.new(1, 0, 0, 130)
-Instance.new("UICorner", updateFrame).CornerRadius = UDim.new(0, 12)
-
-local updateText = Instance.new("TextLabel", updateFrame)
-updateText.BackgroundTransparency = 1
-updateText.Position = UDim2.new(0, 10, 0, 10)
-updateText.Size = UDim2.new(1, -20, 1, -20)
-updateText.Font = Enum.Font.Gotham
-updateText.Text = "• Staff group added again\n• Added new undercover mods\n• Remade the whole menu + added staff alert settings\n• Undercover staff will be updated soon, since it is a bit outdated\n• Use at own risk!!"
-updateText.TextColor3 = theme.TextSecondary
-updateText.TextSize = 12
-updateText.TextXAlignment = Enum.TextXAlignment.Left
-updateText.TextYAlignment = Enum.TextYAlignment.Top
+end, staffPage)
 
 -- Dragging logic
 local dragging, dragInput, dragStart, startPos
@@ -533,10 +710,4 @@ Players.PlayerAdded:Connect(applyESP)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 notify("STAFF ALERT STARTED", "T to toggle menu", 5, "success")
-
-
-
-
-
-
 
