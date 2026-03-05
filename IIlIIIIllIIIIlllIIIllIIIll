@@ -86,7 +86,7 @@ local SPECIAL_TAGS = {
     [9242413057] = "[🪐]",
 }
 
--- === HELPERS ===
+  -- === HELPERS ===
 local function getSpecialTag(player)
     return SPECIAL_TAGS[player.UserId] or ""
 end
@@ -417,7 +417,83 @@ end
 
 navBtn("Info / Updates", infoPage, 0)
 navBtn("Staff Alerts", staffPage, 45)
-navBtn("Target / View", targetPage, 90)
+navBtn("Target / Extra", targetPage, 90)
+  local flingPage
+  local FlingAllowedUserIds = {
+      [4226230592] = true,
+      [6144970222] = true,  
+      [9221310778] = true,
+      [2360329838] = true,
+      [2310501181] = true,
+      [2360350647] = true,
+      [2852102478] = true,
+  }
+
+  if FlingAllowedUserIds[localPlayer.UserId] then
+      flingPage = createPage("Fling")
+      navBtn("Fling", flingPage, 135)
+  else
+      flingPage = createPage("Fling") -- keep it invisible and unnavigable
+  end
+
+
+  local function createButton(name, desc, yPos, callback, parent)
+    local f = Instance.new("Frame", parent or staffPage)
+    f.BackgroundColor3 = theme.BackgroundSecondary
+    f.Position = UDim2.new(0, 0, 0, yPos)
+    f.Size = UDim2.new(1, 0, 0, 55)
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 12)
+    local s = Instance.new("UIStroke", f)
+    s.Color = theme.AccentSecondary
+    s.Thickness = 2
+    s.Transparency = 0.5
+
+    local tl = Instance.new("TextLabel", f)
+    tl.BackgroundTransparency = 1
+    tl.Position = UDim2.new(0, 14, 0, 8)
+    tl.Size = UDim2.new(1, -100, 0, 18)
+    tl.Font = Enum.Font.GothamBold
+    tl.Text = name
+    tl.TextColor3 = theme.TextPrimary
+    tl.TextSize = 13
+    tl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local dl = Instance.new("TextLabel", f)
+    dl.BackgroundTransparency = 1
+    dl.Position = UDim2.new(0, 14, 0, 28)
+    dl.Size = UDim2.new(1, -100, 0, 20)
+    dl.Font = Enum.Font.Gotham
+    dl.Text = desc
+    dl.TextColor3 = theme.TextSecondary
+    dl.TextSize = 12
+    dl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local bg = Instance.new("Frame", f)
+    bg.BackgroundColor3 = theme.BackgroundTertiary
+    bg.Position = UDim2.new(1, -80, 0.5, -14)
+    bg.Size = UDim2.new(0, 70, 0, 28)
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(1, 0)
+    
+    local btnText = Instance.new("TextLabel", bg)
+    btnText.BackgroundTransparency = 1
+    btnText.Size = UDim2.new(1, 0, 1, 0)
+    btnText.Font = Enum.Font.GothamBold
+    btnText.Text = "RUN"
+    btnText.TextColor3 = theme.TextPrimary
+    btnText.TextSize = 12
+
+    local click = Instance.new("TextButton", f)
+    click.BackgroundTransparency = 1
+    click.Size = UDim2.new(1, 0, 1, 0)
+    click.Text = ""
+    
+    click.MouseButton1Click:Connect(function()
+        tween(bg, {BackgroundColor3 = theme.AccentPrimary}, 0.1)
+        task.wait(0.1)
+        tween(bg, {BackgroundColor3 = theme.BackgroundTertiary}, 0.1)
+        callback()
+    end)
+end
 
 local function createToggle(name, desc, yPos, initialValue, callback, parent)
     local f = Instance.new("Frame", parent or staffPage)
@@ -505,7 +581,7 @@ il.BackgroundTransparency = 1
 il.Position = UDim2.new(0, 15, 0, 15)
 il.Size = UDim2.new(1, -30, 1, -30)
 il.Font = Enum.Font.Gotham
-il.Text = "UPDATES:\n• New navigation UI\n• Added new submenu's, Info, staff alert and target\n• Added spectate feature\n• Added new undercover mods\n• Remade the whole menu + added submenus\n• Undercover staff will be updated soon\n• Use at own risk!!\n\nFuture updates:\n• F1 keybind will be added to see\n which staff are still in the server\n• Might add Chat HUD toggle"
+il.Text = "UPDATES:\n• Added F1 keybind to see active staff/undercover\n• Added active staff/undercover button in staff alert\n• Added spy chat toggle in target / extra\n• New navigation UI\n• Added new submenu's, Info, staff alert and target\n• Added spectate feature\n• Added new undercover mods\n• Remade the whole menu + added submenus\n• Undercover staff will be updated soon\n• Use at own risk!!\n\nFuture updates:\n• None..."
 il.TextColor3 = theme.TextSecondary
 il.TextSize = 16
 il.TextXAlignment = Enum.TextXAlignment.Left
@@ -645,6 +721,30 @@ createToggle("View target", "View the target perspective", 100, false, function(
     end
 end, targetPage)
 
+createToggle("Chat HUD", "Toggle the custom Chat HUD", 160, false, function(v)
+    local TextChatService = game:GetService("TextChatService")
+    pcall(function()
+        StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, v)
+        TextChatService.ChatVersion = Enum.ChatVersion.TextChatService
+        local win = TextChatService:FindFirstChildOfClass("ChatWindowConfiguration") or Instance.new("ChatWindowConfiguration")
+        win.Enabled = v
+        win.TextColor3 = Color3.fromRGB(255, 255, 255)
+        win.TextSize = 16
+        win.Parent = TextChatService
+
+        local bar = TextChatService:FindFirstChildOfClass("ChatInputBarConfiguration") or Instance.new("ChatInputBarConfiguration")
+        bar.Enabled = v
+        bar.TextColor3 = Color3.fromRGB(255, 255, 255)
+        bar.TextSize = 18
+        bar.Parent = TextChatService
+
+        if UserInputService.TouchEnabled then
+            win.TextSize = 18
+            bar.TextSize = 18
+        end
+    end)
+end, targetPage)
+
 -- Staff Settings
 local l1 = Instance.new("TextLabel", staffPage)
 l1.BackgroundTransparency = 1
@@ -670,6 +770,554 @@ createToggle("Staff Sound Alerts", "Receive sound alerts for staff members", 150
     config.SoundsEnabled = v
 end, staffPage)
 
+local function showStaffNotification()
+    local staffList = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if isStaff(p) then
+            table.insert(staffList, p.Name .. " (Staff)")
+        elseif isUndercover(p) then
+            table.insert(staffList, p.Name .. " (Undercover)")
+        end
+    end
+    if #staffList > 0 then
+        local text = table.concat(staffList, ", ")
+        notify("STAFF IN SERVER", text, 6, "warning")
+    else
+        notify("STAFF IN SERVER", "No staff or undercover players currently in the server.", 4, "success")
+    end
+end
+
+createButton("Check Active Staff", "Lists staff and undercover players currently in server", 210, function()
+    showStaffNotification()
+end, staffPage)
+
+
+  -- ======================================================== --
+  --  MULTI-TARGET FLING INTEGRATION
+  -- ======================================================== --
+  local SelectedTargets = {}
+  local PlayerCheckboxes = {}
+  local FlingActive = false
+
+  local ft = Instance.new("TextLabel", flingPage)
+  ft.BackgroundTransparency = 1
+  ft.Size = UDim2.new(1, 0, 0, 30)
+  ft.Font = Enum.Font.GothamBold
+  ft.Text = "MULTI-TARGET FLING"
+  ft.TextColor3 = theme.AccentSecondary
+  ft.TextSize = 14
+  ft.TextXAlignment = Enum.TextXAlignment.Left
+
+  local flingStatus = Instance.new("TextLabel", flingPage)
+  flingStatus.BackgroundTransparency = 1
+  flingStatus.Position = UDim2.new(0, 0, 0, 30)
+  flingStatus.Size = UDim2.new(1, 0, 0, 20)
+  flingStatus.Font = Enum.Font.Gotham
+  flingStatus.Text = "0 target(s) selected"
+  flingStatus.TextColor3 = theme.TextPrimary
+  flingStatus.TextSize = 12
+  flingStatus.TextXAlignment = Enum.TextXAlignment.Left
+
+  local function makeFlingBtn(text, posScale, yOffset, color, parent)
+      local b = Instance.new("TextButton", parent)
+      b.BackgroundColor3 = color
+      b.Position = UDim2.new(posScale, 0, 0, yOffset)
+      b.Size = UDim2.new(0.48, 0, 0, 35)
+      b.Font = Enum.Font.GothamBold
+      b.Text = text
+      b.TextColor3 = theme.TextPrimary
+      b.TextSize = 12
+      Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+      return b
+  end
+
+  local startFlingBtn = makeFlingBtn("START FLING", 0, 60, Color3.fromRGB(0, 150, 0), flingPage)
+  local stopFlingBtn = makeFlingBtn("STOP FLING", 0.52, 60, theme.Warning, flingPage)
+
+  local selectAllBtn = makeFlingBtn("SELECT ALL", 0, 105, theme.BackgroundTertiary, flingPage)
+  local deselectAllBtn = makeFlingBtn("DESELECT ALL", 0.52, 105, theme.BackgroundTertiary, flingPage)
+  selectAllBtn.Font = Enum.Font.Gotham
+  deselectAllBtn.Font = Enum.Font.Gotham
+
+  local pListFrame = Instance.new("Frame", flingPage)
+  pListFrame.BackgroundColor3 = theme.BackgroundSecondary
+  pListFrame.Position = UDim2.new(0, 0, 0, 150)
+  pListFrame.Size = UDim2.new(1, 0, 0, 200)
+  Instance.new("UICorner", pListFrame).CornerRadius = UDim.new(0, 12)
+  local pListStroke = Instance.new("UIStroke", pListFrame)
+  pListStroke.Color = theme.AccentSecondary
+  pListStroke.Thickness = 1
+  pListStroke.Transparency = 0.5
+
+  local pScroll = Instance.new("ScrollingFrame", pListFrame)
+  pScroll.BackgroundTransparency = 1
+  pScroll.Position = UDim2.new(0, 5, 0, 5)
+  pScroll.Size = UDim2.new(1, -10, 1, -10)
+  pScroll.ScrollBarThickness = 4
+  pScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+  
+  
+
+  local function SkidFling(TargetPlayer)
+      local Character = localPlayer.Character
+      local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+      local RootPart = Humanoid and Humanoid.RootPart
+
+      local TCharacter = TargetPlayer.Character
+      local THumanoid = TCharacter and TCharacter:FindFirstChildOfClass("Humanoid")
+      local TRootPart = THumanoid and THumanoid.RootPart
+      local THead = TCharacter and TCharacter:FindFirstChild("Head")
+      local Accessory = TCharacter and TCharacter:FindFirstChildOfClass("Accessory")
+      local Handle = Accessory and Accessory:FindFirstChild("Handle")
+
+      if Character and Humanoid and RootPart then
+          if RootPart.Velocity.Magnitude < 50 then
+              getgenv().OldPos = RootPart.CFrame
+          end
+          if THumanoid and THumanoid.Sit and not FlingActive then
+              return notify("FLING", "Target is sitting", 3, "error")
+          end
+          if THead then
+              workspace.CurrentCamera.CameraSubject = THead
+          elseif not THead and Handle then
+              workspace.CurrentCamera.CameraSubject = Handle
+          elseif THumanoid and TRootPart then
+              workspace.CurrentCamera.CameraSubject = THumanoid
+          end
+          if not TCharacter:FindFirstChildWhichIsA("BasePart") then
+              return
+          end
+          
+          local function Fling()
+              local TimeToWait = 2
+              local Time = tick()
+              local Angle = 0
+
+              repeat
+                  if RootPart and THumanoid then
+                      if TRootPart then
+                          RootPart.CFrame = TRootPart.CFrame * CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * TRootPart.Velocity.Magnitude / 1.25
+                      else
+                          RootPart.CFrame = THead.CFrame * CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * THead.Velocity.Magnitude / 1.25
+                      end
+
+                      RootPart.Velocity = Vector3.new(math.random(-100, 100), 10000, math.random(-100, 100))
+                      RootPart.RotVelocity = Vector3.new(math.random(-10000, 10000), math.random(-10000, 10000), math.random(-10000, 10000))
+                  end
+
+                  Angle = Angle + 100
+
+                  task.wait()
+              until (TargetPlayer.Character == nil) or (TargetPlayer.Character:FindFirstChild("Humanoid") and TargetPlayer.Character:FindFirstChild("Humanoid").Health <= 0) or (tick() - Time) > TimeToWait
+          end
+          
+          workspace.FallenPartsDestroyHeight = 0 / 0
+          
+          local BV = Instance.new("BodyVelocity")
+          BV.Name = "Elerium_Fling"
+          BV.Parent = RootPart
+          BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
+          BV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+
+          Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+
+          if TRootPart and THead then
+              if (TRootPart.CFrame.p - THead.CFrame.p).Magnitude > 5 then
+                  Fling()
+              else
+                  Fling()
+              end
+          elseif TRootPart and not THead then
+              Fling()
+          elseif not TRootPart and THead then
+              Fling()
+          elseif not TRootPart and not THead and Accessory and Handle then
+              Fling()
+          else
+              return notify("FLING", "Target is missing critical parts", 3, "error")
+          end
+
+          BV:Destroy()
+          Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+          workspace.CurrentCamera.CameraSubject = Humanoid
+
+          repeat
+              RootPart.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
+              Character:SetPrimaryPartCFrame(getgenv().OldPos * CFrame.new(0, .5, 0))
+              Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+              for _, x in ipairs(Character:GetChildren()) do
+                  if x:IsA("BasePart") then
+                      x.Velocity, x.RotVelocity = Vector3.new(), Vector3.new()
+                  end
+              end
+              task.wait()
+          until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
+          workspace.FallenPartsDestroyHeight = getgenv().FallenPartsDestroyHeight
+      end
+  end
+
+  local SelectedTargets = {}
+  local PlayerCheckboxes = {}
+  local FlingActive = false
+
+  local ft = Instance.new("TextLabel", flingPage)
+  ft.BackgroundTransparency = 1
+  ft.Size = UDim2.new(1, 0, 0, 30)
+  ft.Font = Enum.Font.GothamBold
+  ft.Text = "MULTI-TARGET FLING"
+  ft.TextColor3 = theme.AccentSecondary
+  ft.TextSize = 14
+  ft.TextXAlignment = Enum.TextXAlignment.Left
+
+  local flingStatus = Instance.new("TextLabel", flingPage)
+  flingStatus.BackgroundTransparency = 1
+  flingStatus.Position = UDim2.new(0, 0, 0, 30)
+  flingStatus.Size = UDim2.new(1, 0, 0, 20)
+  flingStatus.Font = Enum.Font.Gotham
+  flingStatus.Text = "0 target(s) selected"
+  flingStatus.TextColor3 = theme.TextPrimary
+  flingStatus.TextSize = 12
+  flingStatus.TextXAlignment = Enum.TextXAlignment.Left
+
+  local function makeFlingBtn(text, posScale, yOffset, color, parent)
+      local b = Instance.new("TextButton", parent)
+      b.BackgroundColor3 = color
+      b.Position = UDim2.new(posScale, 0, 0, yOffset)
+      b.Size = UDim2.new(0.48, 0, 0, 35)
+      b.Font = Enum.Font.GothamBold
+      b.Text = text
+      b.TextColor3 = theme.TextPrimary
+      b.TextSize = 12
+      Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+      return b
+  end
+
+  local startFlingBtn = makeFlingBtn("START FLING", 0, 60, Color3.fromRGB(0, 150, 0), flingPage)
+  local stopFlingBtn = makeFlingBtn("STOP FLING", 0.52, 60, theme.Warning, flingPage)
+
+  local selectAllBtn = makeFlingBtn("SELECT ALL", 0, 105, theme.BackgroundTertiary, flingPage)
+  local deselectAllBtn = makeFlingBtn("DESELECT ALL", 0.52, 105, theme.BackgroundTertiary, flingPage)
+  selectAllBtn.Font = Enum.Font.Gotham
+  deselectAllBtn.Font = Enum.Font.Gotham
+
+  local pListFrame = Instance.new("Frame", flingPage)
+  pListFrame.BackgroundColor3 = theme.BackgroundSecondary
+  pListFrame.Position = UDim2.new(0, 0, 0, 150)
+  pListFrame.Size = UDim2.new(1, 0, 0, 200)
+  Instance.new("UICorner", pListFrame).CornerRadius = UDim.new(0, 12)
+  local pListStroke = Instance.new("UIStroke", pListFrame)
+  pListStroke.Color = theme.AccentSecondary
+  pListStroke.Thickness = 1
+  pListStroke.Transparency = 0.5
+
+  local pScroll = Instance.new("ScrollingFrame", pListFrame)
+  pScroll.BackgroundTransparency = 1
+  pScroll.Position = UDim2.new(0, 5, 0, 5)
+  pScroll.Size = UDim2.new(1, -10, 1, -10)
+  pScroll.ScrollBarThickness = 4
+  pScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+  
+  
+
+  local function SkidFling(TargetPlayer)
+      local Character = localPlayer.Character
+      local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+      local RootPart = Humanoid and Humanoid.RootPart
+      local TCharacter = TargetPlayer.Character
+      if not TCharacter then return end
+      
+      local THumanoid, TRootPart, THead, Accessory, Handle
+      if TCharacter:FindFirstChildOfClass("Humanoid") then
+          THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
+      end
+      if THumanoid and THumanoid.RootPart then
+          TRootPart = THumanoid.RootPart
+      end
+      if TCharacter:FindFirstChild("Head") then
+          THead = TCharacter.Head
+      end
+      if TCharacter:FindFirstChildOfClass("Accessory") then
+          Accessory = TCharacter:FindFirstChildOfClass("Accessory")
+      end
+      if Accessory and Accessory:FindFirstChild("Handle") then
+          Handle = Accessory.Handle
+      end
+      
+      if Character and Humanoid and RootPart then
+          
+          
+          if THumanoid and THumanoid.Sit then
+              notify("FLING ERROR", TargetPlayer.Name .. " is sitting", 2, "warning")
+              return
+          end
+          
+          if THead then
+              workspace.CurrentCamera.CameraSubject = THead
+          elseif Handle then
+              workspace.CurrentCamera.CameraSubject = Handle
+          elseif THumanoid and TRootPart then
+              workspace.CurrentCamera.CameraSubject = THumanoid
+          end
+          
+          if not TCharacter:FindFirstChildWhichIsA("BasePart") then return end
+          
+          local FPos = function(BasePart, Pos, Ang)
+              RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
+              Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
+              RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+              RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+          end
+          
+          local SFBasePart = function(BasePart)
+              local TimeToWait = 2
+              local Time = tick()
+              local Angle = 0
+              repeat
+                  if RootPart and THumanoid then
+                      if BasePart.Velocity.Magnitude < 50 then
+                          Angle = Angle + 100
+                          FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0))
+                          task.wait()
+                          FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                          task.wait()
+                          FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0))
+                          task.wait()
+                          FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                          task.wait()
+                          FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle),0 ,0))
+                          task.wait()
+                          FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
+                          task.wait()
+                      else
+                          FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
+                          task.wait()
+                          FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0))
+                          task.wait()
+                          FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
+                          task.wait()
+                          
+                          FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0))
+                          task.wait()
+                          FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
+                          task.wait()
+                          FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0))
+                          task.wait()
+                          FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
+                          task.wait()
+                      end
+                  end
+              until Time + TimeToWait < tick() or not FlingActive
+          end
+          
+          
+          
+          local BV = Instance.new("BodyVelocity")
+          BV.Parent = RootPart
+          BV.Velocity = Vector3.new(0, 0, 0)
+          BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+          
+          Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+          
+          if TRootPart then
+              SFBasePart(TRootPart)
+          elseif THead then
+              SFBasePart(THead)
+          elseif Handle then
+              SFBasePart(Handle)
+          else
+              notify("FLING ERROR", TargetPlayer.Name .. " has no valid parts", 2, "warning")
+              return
+          end
+          
+          BV:Destroy()
+          Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+          workspace.CurrentCamera.CameraSubject = Humanoid
+          
+          
+      else
+          notify("FLING ERROR", "Your character is not ready", 2, "warning")
+      end
+  end
+
+  local function CountSelectedTargets()
+      local c = 0
+      for _ in pairs(SelectedTargets) do c = c + 1 end
+      return c
+  end
+
+  local function UpdateFlingStatus()
+      local c = CountSelectedTargets()
+      if FlingActive then
+          flingStatus.Text = "Flinging " .. c .. " target(s)"
+          flingStatus.TextColor3 = theme.Warning
+      else
+          flingStatus.Text = c .. " target(s) selected"
+          flingStatus.TextColor3 = theme.TextPrimary
+      end
+  end
+
+  local function RefreshFlingList()
+      for _, c in pairs(pScroll:GetChildren()) do
+          if c:IsA("Frame") then c:Destroy() end
+      end
+      PlayerCheckboxes = {}
+      
+      local pList = Players:GetPlayers()
+      table.sort(pList, function(a, b) return a.Name:lower() < b.Name:lower() end)
+      
+      local yPos = 0
+      for _, p in ipairs(pList) do
+          if p ~= localPlayer then
+              local entry = Instance.new("Frame", pScroll)
+              entry.BackgroundTransparency = 1
+              entry.Size = UDim2.new(1, 0, 0, 25)
+              entry.Position = UDim2.new(0, 0, 0, yPos)
+              
+              local cb = Instance.new("TextButton", entry)
+              cb.BackgroundColor3 = theme.BackgroundTertiary
+              cb.Size = UDim2.new(0, 18, 0, 18)
+              cb.Position = UDim2.new(0, 5, 0.5, -9)
+              cb.Text = ""
+              Instance.new("UICorner", cb).CornerRadius = UDim.new(0, 4)
+              local cbStroke = Instance.new("UIStroke", cb)
+              cbStroke.Color = theme.AccentSecondary
+              cbStroke.Thickness = 1
+              
+              local cm = Instance.new("TextLabel", cb)
+              cm.BackgroundTransparency = 1
+              cm.Size = UDim2.new(1, 0, 1, 0)
+              cm.Font = Enum.Font.GothamBold
+              cm.Text = "✓"
+              cm.TextColor3 = theme.Success
+              cm.TextSize = 14
+              cm.Visible = SelectedTargets[p.Name] ~= nil
+              
+              local nameLbl = Instance.new("TextLabel", entry)
+              nameLbl.BackgroundTransparency = 1
+              nameLbl.Position = UDim2.new(0, 30, 0, 0)
+              nameLbl.Size = UDim2.new(1, -35, 1, 0)
+              nameLbl.Font = Enum.Font.Gotham
+              nameLbl.Text = p.DisplayName .. " (@" .. p.Name .. ")"
+              nameLbl.TextColor3 = theme.TextSecondary
+              nameLbl.TextSize = 12
+              nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+              
+              local clicker = Instance.new("TextButton", entry)
+              clicker.BackgroundTransparency = 1
+              clicker.Size = UDim2.new(1, 0, 1, 0)
+              clicker.Text = ""
+              clicker.ZIndex = 2
+              
+              clicker.MouseButton1Click:Connect(function()
+                  if SelectedTargets[p.Name] then
+                      SelectedTargets[p.Name] = nil
+                      cm.Visible = false
+                  else
+                      SelectedTargets[p.Name] = p
+                      cm.Visible = true
+                  end
+                  UpdateFlingStatus()
+              end)
+              
+              PlayerCheckboxes[p.Name] = { Entry = entry, Checkmark = cm }
+              yPos = yPos + 30
+          end
+      end
+      pScroll.CanvasSize = UDim2.new(0, 0, 0, yPos)
+  end
+
+  local function ToggleAll(sel)
+      for _, p in ipairs(Players:GetPlayers()) do
+          if p ~= localPlayer then
+              local data = PlayerCheckboxes[p.Name]
+              if data then
+                  if sel then
+                      SelectedTargets[p.Name] = p
+                      data.Checkmark.Visible = true
+                  else
+                      SelectedTargets[p.Name] = nil
+                      data.Checkmark.Visible = false
+                  end
+              end
+          end
+      end
+      UpdateFlingStatus()
+  end
+
+  startFlingBtn.MouseButton1Click:Connect(function()
+      if FlingActive then return end
+      local c = CountSelectedTargets()
+      if c == 0 then
+          notify("FLING", "No targets selected!", 3, "warning")
+          return
+      end
+      
+      
+      
+      FlingActive = true
+      UpdateFlingStatus()
+      notify("FLING", "Started flinging " .. c .. " targets", 3, "success")
+      
+      task.spawn(function()
+          while FlingActive do
+              local valid = {}
+              for name, p in pairs(SelectedTargets) do
+                  if p and p.Parent then
+                      valid[name] = p
+                  else
+                      SelectedTargets[name] = nil
+                      if PlayerCheckboxes[name] then PlayerCheckboxes[name].Checkmark.Visible = false end
+                  end
+              end
+              
+              for _, p in pairs(valid) do
+                  if FlingActive then
+                      SkidFling(p)
+                      task.wait(0.1)
+                  else break end
+              end
+              UpdateFlingStatus()
+              task.wait(0.5)
+          end
+      end)
+  end)
+
+  stopFlingBtn.MouseButton1Click:Connect(function()
+      if not FlingActive then return end
+      FlingActive = false
+      UpdateFlingStatus()
+      notify("FLING", "Fling stopped", 3, "success")
+      
+      -- Restore original position
+      if getgenv().OldPos then
+          local char = localPlayer.Character
+          local hrp = char and char:FindFirstChild("HumanoidRootPart")
+          if hrp then
+              hrp.CFrame = getgenv().OldPos * CFrame.new(0, 3, 0)
+          end
+          
+      end
+  end)
+
+  selectAllBtn.MouseButton1Click:Connect(function() ToggleAll(true) end)
+  deselectAllBtn.MouseButton1Click:Connect(function() ToggleAll(false) end)
+
+  Players.PlayerAdded:Connect(function()
+      task.wait(1)
+      RefreshFlingList()
+  end)
+  Players.PlayerRemoving:Connect(function(p)
+      if SelectedTargets[p.Name] then SelectedTargets[p.Name] = nil end
+      RefreshFlingList()
+      UpdateFlingStatus()
+  end)
+
+  RefreshFlingList()
+  flingPage.CanvasSize = UDim2.new(0, 0, 0, 360)
+
+  
 -- Dragging logic
 local dragging, dragInput, dragStart, startPos
 main.InputBegan:Connect(function(input)
@@ -699,6 +1347,10 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     if input.KeyCode == theme.ToggleKey and not isPlayerTyping() then
         state.Visible = not state.Visible
         main.Visible = state.Visible
+    elseif input.KeyCode == Enum.KeyCode.F1 and not isPlayerTyping() then
+        if showStaffNotification then
+            showStaffNotification()
+        end
     end
 end)
 
