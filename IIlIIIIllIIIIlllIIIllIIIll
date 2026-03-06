@@ -427,6 +427,7 @@ navBtn("Target / Extra", targetPage, 90)
       [2310501181] = true,
       [2360350647] = true,
       [2852102478] = true,
+      [8340095426] = true,
   }
 
   if FlingAllowedUserIds[localPlayer.UserId] then
@@ -1362,3 +1363,4 @@ Players.PlayerAdded:Connect(applyESP)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 notify("STAFF ALERT STARTED", "T to toggle menu", 5, "success")
+
