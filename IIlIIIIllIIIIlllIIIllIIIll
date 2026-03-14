@@ -54,7 +54,7 @@ local config = {
     StaffESPEnabled = true,
     NotificationsEnabled = true,
     SoundsEnabled = true,
-    GroupId = 811783767
+    GroupId = 106259084
 }
 
 local state = {
