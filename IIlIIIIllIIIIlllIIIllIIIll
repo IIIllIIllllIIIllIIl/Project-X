@@ -327,73 +327,72 @@ mainStroke.Thickness = 3
 mainStroke.Transparency = 0.2
 addGlow(main, theme.AccentPrimary, 0.7)
 
--- Sidebar
-local sidebar = Instance.new("Frame", main)
-sidebar.BackgroundColor3 = theme.BackgroundSecondary
-sidebar.Size = UDim2.new(0, 150, 1, 0)
-Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 16)
-addGradient(sidebar, theme.BackgroundSecondary, theme.BackgroundTertiary)
+-- Topbar (always visible across all submenus)
+local topbar = Instance.new("Frame", main)
+topbar.BackgroundColor3 = theme.BackgroundSecondary
+topbar.Position = UDim2.new(0, 0, 0, 0)
+topbar.Size = UDim2.new(1, 0, 0, 55)
+topbar.ZIndex = 5
+Instance.new("UICorner", topbar).CornerRadius = UDim.new(0, 16)
+addGradient(topbar, theme.BackgroundSecondary, theme.BackgroundTertiary)
 
-local sideLogo = Instance.new("Frame", sidebar)
+local topbarLine = Instance.new("Frame", topbar)
+topbarLine.BackgroundColor3 = theme.AccentPrimary
+topbarLine.BackgroundTransparency = 0.6
+topbarLine.Position = UDim2.new(0, 0, 1, -1)
+topbarLine.Size = UDim2.new(1, 0, 0, 1)
+topbarLine.ZIndex = 6
+
+-- Logo (moved to topbar)
+local sideLogo = Instance.new("Frame", topbar)
 sideLogo.BackgroundColor3 = theme.AccentSecondary
-sideLogo.Position = UDim2.new(0, 15, 0, 15)
+sideLogo.Position = UDim2.new(0, 15, 0, 12)
 sideLogo.Size = UDim2.new(0, 30, 0, 30)
+sideLogo.ZIndex = 6
 Instance.new("UICorner", sideLogo).CornerRadius = UDim.new(0, 6)
 
-local sideTitle = Instance.new("TextLabel", sidebar)
+-- STAFF title (moved to topbar)
+local sideTitle = Instance.new("TextLabel", topbar)
 sideTitle.BackgroundTransparency = 1
-sideTitle.Position = UDim2.new(0, 55, 0, 15)
-sideTitle.Size = UDim2.new(0, 80, 0, 30)
+sideTitle.Position = UDim2.new(0, 55, 0, 12)
+sideTitle.Size = UDim2.new(0, 60, 0, 30)
 sideTitle.Font = Enum.Font.GothamBold
-sideTitle.Text = "STAFF"
+sideTitle.Text = "VF STAFF ALERT"
 sideTitle.TextColor3 = theme.TextPrimary
 sideTitle.TextSize = 14
 sideTitle.TextXAlignment = Enum.TextXAlignment.Left
+sideTitle.ZIndex = 6
 
--- Note input: editable field for important messages
-local noteInput = Instance.new("TextBox", sidebar)
-noteInput.BackgroundColor3 = theme.BackgroundTertiary
-noteInput.BackgroundTransparency = 0.3
-noteInput.Position = UDim2.new(0, 8, 0, 50)
-noteInput.Size = UDim2.new(1, -16, 0, 22)
-noteInput.Font = Enum.Font.Gotham
-noteInput.PlaceholderText = "Write something important..."
-noteInput.Text = ""
-noteInput.TextColor3 = theme.TextPrimary
-noteInput.PlaceholderColor3 = theme.TextSecondary
-noteInput.TextSize = 10
-noteInput.TextXAlignment = Enum.TextXAlignment.Left
-noteInput.ClearTextOnFocus = false
-noteInput.MultiLine = false
-Instance.new("UICorner", noteInput).CornerRadius = UDim.new(0, 6)
-local noteStroke = Instance.new("UIStroke", noteInput)
-noteStroke.Color = theme.AccentSecondary
-noteStroke.Thickness = 1
-noteStroke.Transparency = 0.5
-local notePadding = Instance.new("UIPadding", noteInput)
-notePadding.PaddingLeft = UDim.new(0, 6)
-notePadding.PaddingRight = UDim.new(0, 6)
+-- Announcement label in topbar
+local topAnnouncement = Instance.new("TextLabel", topbar)
+topAnnouncement.BackgroundTransparency = 1
+topAnnouncement.Position = UDim2.new(0, 165, 0, 0)
+topAnnouncement.Size = UDim2.new(1, -130, 1, 0)
+topAnnouncement.Font = Enum.Font.GothamBold
+topAnnouncement.Text = "Last updated: 03/04/2026"
+topAnnouncement.TextColor3 = theme.TextSecondary
+topAnnouncement.TextSize = 17
+topAnnouncement.TextXAlignment = Enum.TextXAlignment.Left
+topAnnouncement.TextYAlignment = Enum.TextYAlignment.Center
+topAnnouncement.ZIndex = 6
 
--- Subtitle showing last updated date
-local sideSubtitle = Instance.new("TextLabel", sidebar)
-sideSubtitle.BackgroundTransparency = 1
-sideSubtitle.Position = UDim2.new(0, 8, 0, 75)
-sideSubtitle.Size = UDim2.new(1, -16, 0, 16)
-sideSubtitle.Font = Enum.Font.Gotham
-sideSubtitle.Text = "Last updated 03/04/2026"
-sideSubtitle.TextColor3 = theme.TextSecondary
-sideSubtitle.TextSize = 9
-sideSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+-- Sidebar (now starts below topbar)
+local sidebar = Instance.new("Frame", main)
+sidebar.BackgroundColor3 = theme.BackgroundSecondary
+sidebar.Position = UDim2.new(0, 0, 0, 55)
+sidebar.Size = UDim2.new(0, 150, 1, -55)
+Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 16)
+addGradient(sidebar, theme.BackgroundSecondary, theme.BackgroundTertiary)
 
 local nav = Instance.new("Frame", sidebar)
 nav.BackgroundTransparency = 1
-nav.Position = UDim2.new(0, 0, 0, 95)
-nav.Size = UDim2.new(1, 0, 1, -95)
+nav.Position = UDim2.new(0, 0, 0, 10)
+nav.Size = UDim2.new(1, 0, 1, -10)
 
 local pages = Instance.new("Frame", main)
 pages.BackgroundTransparency = 1
-pages.Position = UDim2.new(0, 150, 0, 0)
-pages.Size = UDim2.new(1, -150, 1, 0)
+pages.Position = UDim2.new(0, 150, 0, 55)
+pages.Size = UDim2.new(1, -150, 1, -55)
 
 local function createPage(name)
     local p = Instance.new("ScrollingFrame", pages)
@@ -611,7 +610,7 @@ il.BackgroundTransparency = 1
 il.Position = UDim2.new(0, 15, 0, 15)
 il.Size = UDim2.new(1, -30, 1, -30)
 il.Font = Enum.Font.Gotham
-il.Text = "Last Updated: 28/03 UPDATES:\n• New staff group added, due to removal game\nImportant:not all staff joined group due it recently been made, so there will be staff who are yet detected\n• Undercover staff list wiped\n• Use at own risk!!\n• Added F1 keybind to see active staff/undercover\n• Added active staff/undercover button in staff alert\n• Added spy chat toggle in target / extra\n• New navigation UI\n• Added new submenu's, Info, staff alert and target\n• Added spectate feature\n• Added new undercover mods\n• Remade the whole menu + added submenus\n\nFuture updates:\n• None..."
+il.Text = "Information:\n\n• New staff group added, due to removal game\nNot all staff the joined group due it recently been made\n• Use at own risk!!\n• Added F1 keybind to see active staff/undercover\n• New navigation UI\n\nFuture updates:\n• None..."
 il.TextColor3 = theme.TextSecondary
 il.TextSize = 16
 il.TextXAlignment = Enum.TextXAlignment.Left
