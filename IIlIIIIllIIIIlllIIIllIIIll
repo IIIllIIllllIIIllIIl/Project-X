@@ -350,10 +350,45 @@ sideTitle.TextColor3 = theme.TextPrimary
 sideTitle.TextSize = 14
 sideTitle.TextXAlignment = Enum.TextXAlignment.Left
 
+-- Note input: editable field for important messages
+local noteInput = Instance.new("TextBox", sidebar)
+noteInput.BackgroundColor3 = theme.BackgroundTertiary
+noteInput.BackgroundTransparency = 0.3
+noteInput.Position = UDim2.new(0, 8, 0, 50)
+noteInput.Size = UDim2.new(1, -16, 0, 22)
+noteInput.Font = Enum.Font.Gotham
+noteInput.PlaceholderText = "Write something important..."
+noteInput.Text = ""
+noteInput.TextColor3 = theme.TextPrimary
+noteInput.PlaceholderColor3 = theme.TextSecondary
+noteInput.TextSize = 10
+noteInput.TextXAlignment = Enum.TextXAlignment.Left
+noteInput.ClearTextOnFocus = false
+noteInput.MultiLine = false
+Instance.new("UICorner", noteInput).CornerRadius = UDim.new(0, 6)
+local noteStroke = Instance.new("UIStroke", noteInput)
+noteStroke.Color = theme.AccentSecondary
+noteStroke.Thickness = 1
+noteStroke.Transparency = 0.5
+local notePadding = Instance.new("UIPadding", noteInput)
+notePadding.PaddingLeft = UDim.new(0, 6)
+notePadding.PaddingRight = UDim.new(0, 6)
+
+-- Subtitle showing last updated date
+local sideSubtitle = Instance.new("TextLabel", sidebar)
+sideSubtitle.BackgroundTransparency = 1
+sideSubtitle.Position = UDim2.new(0, 8, 0, 75)
+sideSubtitle.Size = UDim2.new(1, -16, 0, 16)
+sideSubtitle.Font = Enum.Font.Gotham
+sideSubtitle.Text = "Last updated 03/04/2026"
+sideSubtitle.TextColor3 = theme.TextSecondary
+sideSubtitle.TextSize = 9
+sideSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+
 local nav = Instance.new("Frame", sidebar)
 nav.BackgroundTransparency = 1
-nav.Position = UDim2.new(0, 0, 0, 60)
-nav.Size = UDim2.new(1, 0, 1, -60)
+nav.Position = UDim2.new(0, 0, 0, 95)
+nav.Size = UDim2.new(1, 0, 1, -95)
 
 local pages = Instance.new("Frame", main)
 pages.BackgroundTransparency = 1
@@ -1357,7 +1392,6 @@ Players.PlayerAdded:Connect(applyESP)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 notify("STAFF ALERT STARTED", "T to toggle menu", 5, "success")
-
 
 
 
