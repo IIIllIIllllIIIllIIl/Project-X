@@ -610,7 +610,7 @@ il.BackgroundTransparency = 1
 il.Position = UDim2.new(0, 15, 0, 15)
 il.Size = UDim2.new(1, -30, 1, -30)
 il.Font = Enum.Font.Gotham
-il.Text = "Information:\n\n• New staff group added, due to removal game\nNot all staff the joined group due it recently been made\n• Use at own risk!!\n• Added F1 keybind to see active staff/undercover\n• New navigation UI\n
+il.Text = "Information:\n\n• New staff group added, due to removal game\nNot all staff the joined group due it recently been made\n• Use at own risk!!\n• Added F1 keybind to see active staff/undercover\n• New navigation UI"
 il.TextColor3 = theme.TextSecondary
 il.TextSize = 16
 il.TextXAlignment = Enum.TextXAlignment.Left
@@ -1391,6 +1391,5 @@ Players.PlayerAdded:Connect(applyESP)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 notify("STAFF ALERT STARTED", "T to toggle menu", 5, "success")
-
 
 
