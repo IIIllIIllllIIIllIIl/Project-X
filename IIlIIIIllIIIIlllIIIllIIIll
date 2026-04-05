@@ -43,6 +43,7 @@ local theme = {
     TextSecondary = Color3.fromRGB(150, 180, 255),
     Success = Color3.fromRGB(0, 255, 150),
     Warning = Color3.fromRGB(255, 100, 0),
+    PossibleStaff = Color3.fromRGB(255, 220, 0),344541287
     ToggleKey = Enum.KeyCode.T
 }
 
@@ -50,11 +51,24 @@ local function isPlayerTyping()
     return UserInputService:GetFocusedTextBox() ~= nil
 end
 
+-- === GROUP CONFIG ===
+-- Main staff group — always has priority
+local MAIN_GROUP_ID = 506714341
+local MAIN_GROUP_NAME = "Verification Force"
+
+-- Possible staff groups — shown with yellow outline if not in main group
+local POSSIBLE_STAFF_GROUPS = {
+    { id = 708955176, name = "Group 708955176" },
+    { id = 344541287, name = "Group 344541287" },
+    { id = 526649056, name = "Group 526649056" },
+    -- Add more possible staff groups here as needed:
+}
+
 local config = {
     StaffESPEnabled = true,
     NotificationsEnabled = true,
     SoundsEnabled = true,
-    GroupId = 506714341
+    GroupId = MAIN_GROUP_ID
 }
 
 local state = {
@@ -80,7 +94,7 @@ local SPECIAL_TAGS = {
     [9242413057] = "[🪐]",
 }
 
-  -- === HELPERS ===
+-- === HELPERS ===
 local function getSpecialTag(player)
     return SPECIAL_TAGS[player.UserId] or ""
 end
@@ -120,6 +134,62 @@ local function addGradient(parent, c1, c2, rot)
     grad.Parent = parent
 end
 
+-- === GROUP MEMBERSHIP HELPERS ===
+
+-- Returns the role of a player in the main staff group, or nil if not in it
+local function getMainGroupRole(player)
+    local inGroup, role
+    local ok1, res1 = pcall(function() return player:IsInGroup(MAIN_GROUP_ID) end)
+    inGroup = ok1 and res1
+    if inGroup then
+        local ok2, res2 = pcall(function() return player:GetRoleInGroup(MAIN_GROUP_ID) end)
+        role = ok2 and res2 or "Member"
+    end
+    return inGroup and role or nil
+end
+
+-- Returns a list of {name, role} for each possible staff group the player is in
+local function getPossibleGroupMemberships(player)
+    local memberships = {}
+    for _, group in ipairs(POSSIBLE_STAFF_GROUPS) do
+        local ok, inGroup = pcall(function() return player:IsInGroup(group.id) end)
+        if ok and inGroup then
+            local ok2, role = pcall(function() return player:GetRoleInGroup(group.id) end)
+            table.insert(memberships, {
+                name = group.name,
+                role = ok2 and role or "Member"
+            })
+        end
+    end
+    return memberships
+end
+
+-- Returns: mainRole (string or nil), possibleMemberships (list of {name, role})
+local function getGroupMemberships(player)
+    local mainRole = getMainGroupRole(player)
+    local possibleMemberships = getPossibleGroupMemberships(player)
+    return mainRole, possibleMemberships
+end
+
+-- Legacy compatibility: returns true if player is in main staff group
+local function isStaff(player)
+    local ok, res = pcall(function() return player:IsInGroup(MAIN_GROUP_ID) end)
+    return ok and res
+end
+
+-- Returns true if player is in any possible staff group
+local function isInAnyPossibleGroup(player)
+    for _, group in ipairs(POSSIBLE_STAFF_GROUPS) do
+        local ok, res = pcall(function() return player:IsInGroup(group.id) end)
+        if ok and res then return true end
+    end
+    return false
+end
+
+local function isUndercover(player)
+    return UNDERCOVER_USERIDS[player.UserId] == true and not isStaff(player)
+end
+
 -- === NOTIFICATIONS ===
 local function updateNotifPositions()
     for i, notif in ipairs(state.Notifications) do
@@ -128,10 +198,22 @@ local function updateNotifPositions()
     end
 end
 
-local function notify(title, text, duration, type)
+local function notify(title, text, duration, type, outlineColor)
     if not config.NotificationsEnabled then return end
-    local color = type == "success" and theme.Success or (type == "warning" and theme.Warning or theme.AccentSecondary)
-    
+    -- outlineColor overrides the default color logic
+    local color
+    if outlineColor then
+        color = outlineColor
+    elseif type == "success" then
+        color = theme.Success
+    elseif type == "warning" then
+        color = theme.Warning
+    elseif type == "possible" then
+        color = theme.PossibleStaff
+    else
+        color = theme.AccentSecondary
+    end
+
     local frame = Instance.new("Frame")
     frame.BackgroundColor3 = theme.BackgroundPrimary
     frame.Position = UDim2.new(1, 20, 0.95, 0)
@@ -196,18 +278,64 @@ local function playSound(id, vol)
     s.Ended:Connect(function() s:Destroy() end)
 end
 
-local function getRole(player)
-    local ok, role = pcall(function() return player:GetRoleInGroup(config.GroupId) end)
-    return ok and role or "Member"
-end
+-- Build the notification body text for a joining/leaving player based on their group memberships
+-- Returns: title, bodyText, outlineColor
+local function buildStaffNotifContent(player, action, mainRole, possibleMemberships)
+    local displayName = getDisplayName(player)
+    local username = player.Name
+    local inMain = mainRole ~= nil
+    local inPossible = #possibleMemberships > 0
 
-local function isStaff(player)
-    local ok, res = pcall(function() return player:IsInGroup(config.GroupId) end)
-    return ok and res
-end
+    local title
+    local body
+    local outlineColor
 
-local function isUndercover(player)
-    return UNDERCOVER_USERIDS[player.UserId] == true and not isStaff(player)
+    if inMain and inPossible then
+        -- In both main group AND at least one possible group
+        -- Green outline (main has priority)
+        outlineColor = theme.Success
+
+        -- Build headline: "DisplayName + group names"
+        local groupNames = {MAIN_GROUP_NAME}
+        for _, m in ipairs(possibleMemberships) do
+            table.insert(groupNames, m.name)
+        end
+        title = displayName .. " | " .. table.concat(groupNames, " & ")
+
+        -- Body: DisplayName (@username) | Main: role | PossibleGroup: role
+        local parts = {displayName .. " (@" .. username .. ")"}
+        table.insert(parts, MAIN_GROUP_NAME .. ": " .. mainRole)
+        for _, m in ipairs(possibleMemberships) do
+            table.insert(parts, m.name .. " [Possible Staff Group]: " .. m.role)
+        end
+        body = table.concat(parts, " | ") .. " — " .. action
+
+    elseif inMain then
+        -- Main group only — green outline
+        outlineColor = theme.Success
+        title = displayName .. " | " .. MAIN_GROUP_NAME
+        body = displayName .. " (@" .. username .. ") — " .. mainRole .. " — " .. action
+
+    elseif inPossible then
+        -- Possible staff group(s) only — yellow outline
+        outlineColor = theme.PossibleStaff
+
+        -- Build headline: "DisplayName + group name(s) | Possible staff group"
+        local groupNames = {}
+        for _, m in ipairs(possibleMemberships) do
+            table.insert(groupNames, m.name)
+        end
+        title = displayName .. " | " .. table.concat(groupNames, " & ") .. " | Possible staff group"
+
+        -- Body: DisplayName (@username) | Group: role
+        local parts = {displayName .. " (@" .. username .. ")"}
+        for _, m in ipairs(possibleMemberships) do
+            table.insert(parts, m.name .. ": " .. m.role)
+        end
+        body = table.concat(parts, " | ") .. " — " .. action
+    end
+
+    return title, body, outlineColor
 end
 
 -- ESP Folder Setup
@@ -228,30 +356,33 @@ local function applyESP(player)
                 end
             end)
         end
-        
+
         player.CharacterAdded:Connect(function(char)
             task.wait(0.5)
             updateDisplay()
         end)
-        
+
         if player.Character then
             updateDisplay()
         end
     end
 
-    local isS = isStaff(player)
+    local mainRole, possibleMemberships = getGroupMemberships(player)
+    local inMain = mainRole ~= nil
+    local inPossible = #possibleMemberships > 0
     local isU = isUndercover(player)
-    if not (isS or isU) then return end
+
+    if not (inMain or inPossible or isU) then return end
 
     local function attach(char)
         if not char then return end
+        local isS = inMain or inPossible
         local key = (isS and "HL_" or "UHL_") .. player.UserId
         local folder = isS and state.StaffESPFolder or state.UndercoverESPFolder
-        
-        -- Remove old highlights if any
+
         local oldHl = folder:FindFirstChild(key)
         if oldHl then oldHl:Destroy() end
-        
+
         local hl = Instance.new("Highlight", folder)
         hl.Name = key
         hl.Adornee = char
@@ -265,8 +396,9 @@ local function applyESP(player)
         end
     end
 
-    if isS then
-        notify(player.DisplayName, player.Name .. " (" .. getRole(player) .. ") joined.", 5)
+    if inMain or inPossible then
+        local title, body, outlineColor = buildStaffNotifContent(player, "joined", mainRole, possibleMemberships)
+        notify(title, body, 5, nil, outlineColor)
         playSound("rbxassetid://8887499160", 2)
     elseif isU then
         notify("⚠ UNDERCOVER STAFF", player.DisplayName .. " (@" .. player.Name .. ") is here!", 6, "warning")
@@ -278,23 +410,30 @@ local function applyESP(player)
 end
 
 local function onPlayerRemoving(player)
-    local isS = isStaff(player)
+    local mainRole, possibleMemberships = getGroupMemberships(player)
+    local inMain = mainRole ~= nil
+    local inPossible = #possibleMemberships > 0
     local isU = isUndercover(player)
-    
-    if isS or isU then
-        local tag = isS and "STAFF MEMBER LEFT" or "UNDERCOVER PLAYER LEFT"
-        notify(tag, player.DisplayName .. " has left the server.", 5, isU and "warning" or "success")
+
+    if inMain or inPossible then
+        local title, body, outlineColor = buildStaffNotifContent(player, "left", mainRole, possibleMemberships)
+        notify(title, body, 5, nil, outlineColor)
         playSound("rbxassetid://1091083826", 2)
-        
-        -- Cleanup ESP
-        local key = (isS and "HL_" or "UHL_") .. player.UserId
-        local folder = isS and state.StaffESPFolder or state.UndercoverESPFolder
-        local hl = folder:FindFirstChild(key)
+
+        local key = "HL_" .. player.UserId
+        local hl = state.StaffESPFolder:FindFirstChild(key)
+        if hl then hl:Destroy() end
+    elseif isU then
+        notify("UNDERCOVER PLAYER LEFT", player.DisplayName .. " has left the server.", 5, "warning")
+        playSound("rbxassetid://1091083826", 2)
+
+        local key = "UHL_" .. player.UserId
+        local hl = state.UndercoverESPFolder:FindFirstChild(key)
         if hl then hl:Destroy() end
     end
 end
 
--- Rainbow loop for staff
+-- Rainbow loop for staff ESP
 task.spawn(function()
     local hue = 0
     while true do
@@ -327,7 +466,7 @@ mainStroke.Thickness = 3
 mainStroke.Transparency = 0.2
 addGlow(main, theme.AccentPrimary, 0.7)
 
--- Topbar (always visible across all submenus)
+-- Topbar
 local topbar = Instance.new("Frame", main)
 topbar.BackgroundColor3 = theme.BackgroundSecondary
 topbar.Position = UDim2.new(0, 0, 0, 0)
@@ -343,7 +482,6 @@ topbarLine.Position = UDim2.new(0, 0, 1, -1)
 topbarLine.Size = UDim2.new(1, 0, 0, 1)
 topbarLine.ZIndex = 6
 
--- Logo (moved to topbar)
 local sideLogo = Instance.new("Frame", topbar)
 sideLogo.BackgroundColor3 = theme.AccentSecondary
 sideLogo.Position = UDim2.new(0, 15, 0, 12)
@@ -351,7 +489,6 @@ sideLogo.Size = UDim2.new(0, 30, 0, 30)
 sideLogo.ZIndex = 6
 Instance.new("UICorner", sideLogo).CornerRadius = UDim.new(0, 6)
 
--- STAFF title (moved to topbar)
 local sideTitle = Instance.new("TextLabel", topbar)
 sideTitle.BackgroundTransparency = 1
 sideTitle.Position = UDim2.new(0, 55, 0, 12)
@@ -363,7 +500,6 @@ sideTitle.TextSize = 14
 sideTitle.TextXAlignment = Enum.TextXAlignment.Left
 sideTitle.ZIndex = 6
 
--- Announcement label in topbar
 local topAnnouncement = Instance.new("TextLabel", topbar)
 topAnnouncement.BackgroundTransparency = 1
 topAnnouncement.Position = UDim2.new(0, 165, 0, 0)
@@ -376,7 +512,7 @@ topAnnouncement.TextXAlignment = Enum.TextXAlignment.Left
 topAnnouncement.TextYAlignment = Enum.TextYAlignment.Center
 topAnnouncement.ZIndex = 6
 
--- Sidebar (now starts below topbar)
+-- Sidebar
 local sidebar = Instance.new("Frame", main)
 sidebar.BackgroundColor3 = theme.BackgroundSecondary
 sidebar.Position = UDim2.new(0, 0, 0, 55)
@@ -424,7 +560,7 @@ local function navBtn(name, page, y)
     b.TextColor3 = theme.TextSecondary
     b.TextSize = 12
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
-    
+
     local s = Instance.new("UIStroke", b)
     s.Color = theme.AccentSecondary
     s.Thickness = 1
@@ -446,27 +582,28 @@ end
 navBtn("Info / Updates", infoPage, 0)
 navBtn("Staff Alerts", staffPage, 45)
 navBtn("Target / Extra", targetPage, 90)
-  local flingPage
-  local FlingAllowedUserIds = {
-      [4226230592] = true,
-      [6144970222] = true,  
-      [9221310778] = true,
-      [2360329838] = true,
-      [2310501181] = true,
-      [2360350647] = true,
-      [2852102478] = true,
-      [8340095426] = true,
-  }
 
-  if FlingAllowedUserIds[localPlayer.UserId] then
-      flingPage = createPage("Fling")
-      navBtn("Fling", flingPage, 135)
-  else
-      flingPage = createPage("Fling") -- keep it invisible and unnavigable
-  end
+local flingPage
+local FlingAllowedUserIds = {
+    [4226230592] = true,
+    [6144970222] = true,
+    [9221310778] = true,
+    [2360329838] = true,
+    [2310501181] = true,
+    [2360350647] = true,
+    [2852102478] = true,
+    [8340095426] = true,
+}
+
+if FlingAllowedUserIds[localPlayer.UserId] then
+    flingPage = createPage("Fling")
+    navBtn("Fling", flingPage, 135)
+else
+    flingPage = createPage("Fling")
+end
 
 
-  local function createButton(name, desc, yPos, callback, parent)
+local function createButton(name, desc, yPos, callback, parent)
     local f = Instance.new("Frame", parent or staffPage)
     f.BackgroundColor3 = theme.BackgroundSecondary
     f.Position = UDim2.new(0, 0, 0, yPos)
@@ -502,7 +639,7 @@ navBtn("Target / Extra", targetPage, 90)
     bg.Position = UDim2.new(1, -80, 0.5, -14)
     bg.Size = UDim2.new(0, 70, 0, 28)
     Instance.new("UICorner", bg).CornerRadius = UDim.new(1, 0)
-    
+
     local btnText = Instance.new("TextLabel", bg)
     btnText.BackgroundTransparency = 1
     btnText.Size = UDim2.new(1, 0, 1, 0)
@@ -515,7 +652,7 @@ navBtn("Target / Extra", targetPage, 90)
     click.BackgroundTransparency = 1
     click.Size = UDim2.new(1, 0, 1, 0)
     click.Text = ""
-    
+
     click.MouseButton1Click:Connect(function()
         tween(bg, {BackgroundColor3 = theme.AccentPrimary}, 0.1)
         task.wait(0.1)
@@ -573,7 +710,7 @@ local function createToggle(name, desc, yPos, initialValue, callback, parent)
     click.BackgroundTransparency = 1
     click.Size = UDim2.new(1, 0, 1, 0)
     click.Text = ""
-    
+
     click.MouseButton1Click:Connect(function()
         val = not val
         callback(val)
@@ -602,7 +739,7 @@ it.TextXAlignment = Enum.TextXAlignment.Left
 local ifr = Instance.new("Frame", infoPage)
 ifr.BackgroundColor3 = theme.BackgroundSecondary
 ifr.Position = UDim2.new(0, 0, 0, 40)
-ifr.Size = UDim2.new(1, 0, 0, 150)
+ifr.Size = UDim2.new(1, 0, 0, 175)
 Instance.new("UICorner", ifr).CornerRadius = UDim.new(0, 12)
 
 local il = Instance.new("TextLabel", ifr)
@@ -610,11 +747,12 @@ il.BackgroundTransparency = 1
 il.Position = UDim2.new(0, 15, 0, 15)
 il.Size = UDim2.new(1, -30, 1, -30)
 il.Font = Enum.Font.Gotham
-il.Text = "Information:\n\n• New staff group added, due to removal game\n•Not all staff the joined group due it recently been made\n• Use at own risk!!\n• Added F1 keybind to see active staff/undercover\n• New navigation UI"
+il.Text = "Information:\n\n• Multiple group support added\n• Green outline = main staff group (priority)\n• Yellow outline = possible staff group only\n• Role shown for every group the player is in\n• F1 shows active staff with group names & roles\n• T to toggle menu | F1 to check active staff"
 il.TextColor3 = theme.TextSecondary
-il.TextSize = 16
+il.TextSize = 14
 il.TextXAlignment = Enum.TextXAlignment.Left
 il.TextYAlignment = Enum.TextYAlignment.Top
+il.TextWrapped = true
 
 -- Populate Target Page
 local tt = Instance.new("TextLabel", targetPage)
@@ -662,25 +800,22 @@ local function getBestMatch(txt)
             table.insert(matches, p)
         end
     end
-    
+
     if #matches == 0 then return nil end
-    
-    -- Priority: Exact match first
+
     for _, p in ipairs(matches) do
         if p.Name:lower() == txt or p.DisplayName:lower() == txt then
             return p
         end
     end
-    
-    -- If multiple matches, don't auto-suggest if it's ambiguous (like edd for eddie vs edda)
-    -- Unless one is a significantly better match (shorter name)
+
     if #matches > 1 then
         table.sort(matches, function(a, b) return #a.Name < #b.Name end)
         if #matches[1].Name == #matches[2].Name then
-            return nil -- Ambiguous
+            return nil
         end
     end
-    
+
     return matches[1]
 end
 
@@ -717,29 +852,27 @@ createToggle("View target", "View the target perspective", 100, false, function(
         if target and target ~= localPlayer then
             input.Text = target.Name
             suggestion.Text = ""
-            
+
             local function updateCamera()
                 if target.Character and target.Character:FindFirstChildOfClass("Humanoid") then
                     Workspace.CurrentCamera.CameraSubject = target.Character:FindFirstChildOfClass("Humanoid")
                 end
             end
-            
+
             if spectateConn then spectateConn:Disconnect() end
             spectateConn = RunService.RenderStepped:Connect(function()
                 if spectating and target.Parent then
                     updateCamera()
                 elseif not target.Parent then
                     v = false
-                    -- Toggle UI would need to be updated here if we had a ref to the toggle state
                 end
             end)
-            
+
             spectating = true
             notify("SPECTATING", "Viewing " .. target.DisplayName, 3, "success")
         else
             spectating = false
             notify("ERROR", target == localPlayer and "Cannot spectate self" or "Player not found", 3, "warning")
-            -- Reset toggle logic here
         end
     else
         spectating = false
@@ -799,18 +932,32 @@ createToggle("Staff Sound Alerts", "Receive sound alerts for staff members", 150
     config.SoundsEnabled = v
 end, staffPage)
 
+-- F1 / Check Active Staff — shows group names and roles for all groups
 local function showStaffNotification()
-    local staffList = {}
+    local lines = {}
     for _, p in ipairs(Players:GetPlayers()) do
-        if isStaff(p) then
-            table.insert(staffList, p.Name .. " (Staff)")
-        elseif isUndercover(p) then
-            table.insert(staffList, p.Name .. " (Undercover)")
+        local mainRole, possibleMemberships = getGroupMemberships(p)
+        local inMain = mainRole ~= nil
+        local inPossible = #possibleMemberships > 0
+        local isU = isUndercover(p)
+
+        if inMain or inPossible then
+            local parts = {}
+            if inMain then
+                table.insert(parts, MAIN_GROUP_NAME .. ": " .. mainRole)
+            end
+            for _, m in ipairs(possibleMemberships) do
+                table.insert(parts, m.name .. " [Possible]: " .. m.role)
+            end
+            table.insert(lines, p.DisplayName .. " (@" .. p.Name .. ") — " .. table.concat(parts, " | "))
+        elseif isU then
+            table.insert(lines, p.DisplayName .. " (@" .. p.Name .. ") — UNDERCOVER")
         end
     end
-    if #staffList > 0 then
-        local text = table.concat(staffList, ", ")
-        notify("STAFF IN SERVER", text, 6, "warning")
+
+    if #lines > 0 then
+        local text = table.concat(lines, "\n")
+        notify("STAFF IN SERVER", text, 8, "warning")
     else
         notify("STAFF IN SERVER", "No staff or undercover players currently in the server.", 4, "success")
     end
@@ -821,532 +968,355 @@ createButton("Check Active Staff", "Lists staff and undercover players currently
 end, staffPage)
 
 
-  -- ======================================================== --
-  --  MULTI-TARGET FLING INTEGRATION
-  -- ======================================================== --
-  local SelectedTargets = {}
-  local PlayerCheckboxes = {}
-  local FlingActive = false
+-- ======================================================== --
+--  MULTI-TARGET FLING INTEGRATION
+-- ======================================================== --
+local SelectedTargets = {}
+local PlayerCheckboxes = {}
+local FlingActive = false
 
-  local ft = Instance.new("TextLabel", flingPage)
-  ft.BackgroundTransparency = 1
-  ft.Size = UDim2.new(1, 0, 0, 30)
-  ft.Font = Enum.Font.GothamBold
-  ft.Text = "MULTI-TARGET FLING"
-  ft.TextColor3 = theme.AccentSecondary
-  ft.TextSize = 14
-  ft.TextXAlignment = Enum.TextXAlignment.Left
+local ft = Instance.new("TextLabel", flingPage)
+ft.BackgroundTransparency = 1
+ft.Size = UDim2.new(1, 0, 0, 30)
+ft.Font = Enum.Font.GothamBold
+ft.Text = "MULTI-TARGET FLING"
+ft.TextColor3 = theme.AccentSecondary
+ft.TextSize = 14
+ft.TextXAlignment = Enum.TextXAlignment.Left
 
-  local flingStatus = Instance.new("TextLabel", flingPage)
-  flingStatus.BackgroundTransparency = 1
-  flingStatus.Position = UDim2.new(0, 0, 0, 30)
-  flingStatus.Size = UDim2.new(1, 0, 0, 20)
-  flingStatus.Font = Enum.Font.Gotham
-  flingStatus.Text = "0 target(s) selected"
-  flingStatus.TextColor3 = theme.TextPrimary
-  flingStatus.TextSize = 12
-  flingStatus.TextXAlignment = Enum.TextXAlignment.Left
+local flingStatus = Instance.new("TextLabel", flingPage)
+flingStatus.BackgroundTransparency = 1
+flingStatus.Position = UDim2.new(0, 0, 0, 30)
+flingStatus.Size = UDim2.new(1, 0, 0, 20)
+flingStatus.Font = Enum.Font.Gotham
+flingStatus.Text = "0 target(s) selected"
+flingStatus.TextColor3 = theme.TextPrimary
+flingStatus.TextSize = 12
+flingStatus.TextXAlignment = Enum.TextXAlignment.Left
 
-  local function makeFlingBtn(text, posScale, yOffset, color, parent)
-      local b = Instance.new("TextButton", parent)
-      b.BackgroundColor3 = color
-      b.Position = UDim2.new(posScale, 0, 0, yOffset)
-      b.Size = UDim2.new(0.48, 0, 0, 35)
-      b.Font = Enum.Font.GothamBold
-      b.Text = text
-      b.TextColor3 = theme.TextPrimary
-      b.TextSize = 12
-      Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
-      return b
-  end
+local function makeFlingBtn(text, posScale, yOffset, color, parent)
+    local b = Instance.new("TextButton", parent)
+    b.BackgroundColor3 = color
+    b.Position = UDim2.new(posScale, 0, 0, yOffset)
+    b.Size = UDim2.new(0.48, 0, 0, 35)
+    b.Font = Enum.Font.GothamBold
+    b.Text = text
+    b.TextColor3 = theme.TextPrimary
+    b.TextSize = 12
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    return b
+end
 
-  local startFlingBtn = makeFlingBtn("START FLING", 0, 60, Color3.fromRGB(0, 150, 0), flingPage)
-  local stopFlingBtn = makeFlingBtn("STOP FLING", 0.52, 60, theme.Warning, flingPage)
+local startFlingBtn = makeFlingBtn("START FLING", 0, 60, Color3.fromRGB(0, 150, 0), flingPage)
+local stopFlingBtn = makeFlingBtn("STOP FLING", 0.52, 60, theme.Warning, flingPage)
 
-  local selectAllBtn = makeFlingBtn("SELECT ALL", 0, 105, theme.BackgroundTertiary, flingPage)
-  local deselectAllBtn = makeFlingBtn("DESELECT ALL", 0.52, 105, theme.BackgroundTertiary, flingPage)
-  selectAllBtn.Font = Enum.Font.Gotham
-  deselectAllBtn.Font = Enum.Font.Gotham
+local selectAllBtn = makeFlingBtn("SELECT ALL", 0, 105, theme.BackgroundTertiary, flingPage)
+local deselectAllBtn = makeFlingBtn("DESELECT ALL", 0.52, 105, theme.BackgroundTertiary, flingPage)
+selectAllBtn.Font = Enum.Font.Gotham
+deselectAllBtn.Font = Enum.Font.Gotham
 
-  local pListFrame = Instance.new("Frame", flingPage)
-  pListFrame.BackgroundColor3 = theme.BackgroundSecondary
-  pListFrame.Position = UDim2.new(0, 0, 0, 150)
-  pListFrame.Size = UDim2.new(1, 0, 0, 200)
-  Instance.new("UICorner", pListFrame).CornerRadius = UDim.new(0, 12)
-  local pListStroke = Instance.new("UIStroke", pListFrame)
-  pListStroke.Color = theme.AccentSecondary
-  pListStroke.Thickness = 1
-  pListStroke.Transparency = 0.5
+local pListFrame = Instance.new("Frame", flingPage)
+pListFrame.BackgroundColor3 = theme.BackgroundSecondary
+pListFrame.Position = UDim2.new(0, 0, 0, 150)
+pListFrame.Size = UDim2.new(1, 0, 0, 200)
+Instance.new("UICorner", pListFrame).CornerRadius = UDim.new(0, 12)
+local pListStroke = Instance.new("UIStroke", pListFrame)
+pListStroke.Color = theme.AccentSecondary
+pListStroke.Thickness = 1
+pListStroke.Transparency = 0.5
 
-  local pScroll = Instance.new("ScrollingFrame", pListFrame)
-  pScroll.BackgroundTransparency = 1
-  pScroll.Position = UDim2.new(0, 5, 0, 5)
-  pScroll.Size = UDim2.new(1, -10, 1, -10)
-  pScroll.ScrollBarThickness = 4
-  pScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+local pScroll = Instance.new("ScrollingFrame", pListFrame)
+pScroll.BackgroundTransparency = 1
+pScroll.Position = UDim2.new(0, 5, 0, 5)
+pScroll.Size = UDim2.new(1, -10, 1, -10)
+pScroll.ScrollBarThickness = 4
+pScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-  
-  
+local function SkidFling(TargetPlayer)
+    local Character = localPlayer.Character
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+    local RootPart = Humanoid and Humanoid.RootPart
+    local TCharacter = TargetPlayer.Character
+    if not TCharacter then return end
 
-  local function SkidFling(TargetPlayer)
-      local Character = localPlayer.Character
-      local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-      local RootPart = Humanoid and Humanoid.RootPart
+    local THumanoid, TRootPart, THead, Accessory, Handle
+    if TCharacter:FindFirstChildOfClass("Humanoid") then
+        THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
+    end
+    if THumanoid and THumanoid.RootPart then
+        TRootPart = THumanoid.RootPart
+    end
+    if TCharacter:FindFirstChild("Head") then
+        THead = TCharacter.Head
+    end
+    if TCharacter:FindFirstChildOfClass("Accessory") then
+        Accessory = TCharacter:FindFirstChildOfClass("Accessory")
+    end
+    if Accessory and Accessory:FindFirstChild("Handle") then
+        Handle = Accessory.Handle
+    end
 
-      local TCharacter = TargetPlayer.Character
-      local THumanoid = TCharacter and TCharacter:FindFirstChildOfClass("Humanoid")
-      local TRootPart = THumanoid and THumanoid.RootPart
-      local THead = TCharacter and TCharacter:FindFirstChild("Head")
-      local Accessory = TCharacter and TCharacter:FindFirstChildOfClass("Accessory")
-      local Handle = Accessory and Accessory:FindFirstChild("Handle")
+    if Character and Humanoid and RootPart then
+        if THumanoid and THumanoid.Sit then
+            notify("FLING ERROR", TargetPlayer.Name .. " is sitting", 2, "warning")
+            return
+        end
 
-      if Character and Humanoid and RootPart then
-          if RootPart.Velocity.Magnitude < 50 then
-              getgenv().OldPos = RootPart.CFrame
-          end
-          if THumanoid and THumanoid.Sit and not FlingActive then
-              return notify("FLING", "Target is sitting", 3, "error")
-          end
-          if THead then
-              workspace.CurrentCamera.CameraSubject = THead
-          elseif not THead and Handle then
-              workspace.CurrentCamera.CameraSubject = Handle
-          elseif THumanoid and TRootPart then
-              workspace.CurrentCamera.CameraSubject = THumanoid
-          end
-          if not TCharacter:FindFirstChildWhichIsA("BasePart") then
-              return
-          end
-          
-          local function Fling()
-              local TimeToWait = 2
-              local Time = tick()
-              local Angle = 0
+        if THead then
+            workspace.CurrentCamera.CameraSubject = THead
+        elseif Handle then
+            workspace.CurrentCamera.CameraSubject = Handle
+        elseif THumanoid and TRootPart then
+            workspace.CurrentCamera.CameraSubject = THumanoid
+        end
 
-              repeat
-                  if RootPart and THumanoid then
-                      if TRootPart then
-                          RootPart.CFrame = TRootPart.CFrame * CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * TRootPart.Velocity.Magnitude / 1.25
-                      else
-                          RootPart.CFrame = THead.CFrame * CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * THead.Velocity.Magnitude / 1.25
-                      end
+        if not TCharacter:FindFirstChildWhichIsA("BasePart") then return end
 
-                      RootPart.Velocity = Vector3.new(math.random(-100, 100), 10000, math.random(-100, 100))
-                      RootPart.RotVelocity = Vector3.new(math.random(-10000, 10000), math.random(-10000, 10000), math.random(-10000, 10000))
-                  end
+        local FPos = function(BasePart, Pos, Ang)
+            RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
+            Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
+            RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+            RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+        end
 
-                  Angle = Angle + 100
+        local SFBasePart = function(BasePart)
+            local TimeToWait = 2
+            local Time = tick()
+            local Angle = 0
+            repeat
+                if RootPart and THumanoid then
+                    if BasePart.Velocity.Magnitude < 50 then
+                        Angle = Angle + 100
+                        FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle),0 ,0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
+                        task.wait()
+                    else
+                        FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0))
+                        task.wait()
+                        FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
+                        task.wait()
+                    end
+                end
+            until Time + TimeToWait < tick() or not FlingActive
+        end
 
-                  task.wait()
-              until (TargetPlayer.Character == nil) or (TargetPlayer.Character:FindFirstChild("Humanoid") and TargetPlayer.Character:FindFirstChild("Humanoid").Health <= 0) or (tick() - Time) > TimeToWait
-          end
-          
-          workspace.FallenPartsDestroyHeight = 0 / 0
-          
-          local BV = Instance.new("BodyVelocity")
-          BV.Name = "Elerium_Fling"
-          BV.Parent = RootPart
-          BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
-          BV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+        local BV = Instance.new("BodyVelocity")
+        BV.Parent = RootPart
+        BV.Velocity = Vector3.new(0, 0, 0)
+        BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
 
-          Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
 
-          if TRootPart and THead then
-              if (TRootPart.CFrame.p - THead.CFrame.p).Magnitude > 5 then
-                  Fling()
-              else
-                  Fling()
-              end
-          elseif TRootPart and not THead then
-              Fling()
-          elseif not TRootPart and THead then
-              Fling()
-          elseif not TRootPart and not THead and Accessory and Handle then
-              Fling()
-          else
-              return notify("FLING", "Target is missing critical parts", 3, "error")
-          end
+        if TRootPart then
+            SFBasePart(TRootPart)
+        elseif THead then
+            SFBasePart(THead)
+        elseif Handle then
+            SFBasePart(Handle)
+        else
+            notify("FLING ERROR", TargetPlayer.Name .. " has no valid parts", 2, "warning")
+            return
+        end
 
-          BV:Destroy()
-          Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-          workspace.CurrentCamera.CameraSubject = Humanoid
+        BV:Destroy()
+        Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+        workspace.CurrentCamera.CameraSubject = Humanoid
+    else
+        notify("FLING ERROR", "Your character is not ready", 2, "warning")
+    end
+end
 
-          repeat
-              RootPart.CFrame = getgenv().OldPos * CFrame.new(0, .5, 0)
-              Character:SetPrimaryPartCFrame(getgenv().OldPos * CFrame.new(0, .5, 0))
-              Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-              for _, x in ipairs(Character:GetChildren()) do
-                  if x:IsA("BasePart") then
-                      x.Velocity, x.RotVelocity = Vector3.new(), Vector3.new()
-                  end
-              end
-              task.wait()
-          until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
-          workspace.FallenPartsDestroyHeight = getgenv().FallenPartsDestroyHeight
-      end
-  end
+local function CountSelectedTargets()
+    local c = 0
+    for _ in pairs(SelectedTargets) do c = c + 1 end
+    return c
+end
 
-  local SelectedTargets = {}
-  local PlayerCheckboxes = {}
-  local FlingActive = false
+local function UpdateFlingStatus()
+    local c = CountSelectedTargets()
+    if FlingActive then
+        flingStatus.Text = "Flinging " .. c .. " target(s)"
+        flingStatus.TextColor3 = theme.Warning
+    else
+        flingStatus.Text = c .. " target(s) selected"
+        flingStatus.TextColor3 = theme.TextPrimary
+    end
+end
 
-  local ft = Instance.new("TextLabel", flingPage)
-  ft.BackgroundTransparency = 1
-  ft.Size = UDim2.new(1, 0, 0, 30)
-  ft.Font = Enum.Font.GothamBold
-  ft.Text = "MULTI-TARGET FLING"
-  ft.TextColor3 = theme.AccentSecondary
-  ft.TextSize = 14
-  ft.TextXAlignment = Enum.TextXAlignment.Left
+local function RefreshFlingList()
+    for _, c in pairs(pScroll:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
+    end
+    PlayerCheckboxes = {}
 
-  local flingStatus = Instance.new("TextLabel", flingPage)
-  flingStatus.BackgroundTransparency = 1
-  flingStatus.Position = UDim2.new(0, 0, 0, 30)
-  flingStatus.Size = UDim2.new(1, 0, 0, 20)
-  flingStatus.Font = Enum.Font.Gotham
-  flingStatus.Text = "0 target(s) selected"
-  flingStatus.TextColor3 = theme.TextPrimary
-  flingStatus.TextSize = 12
-  flingStatus.TextXAlignment = Enum.TextXAlignment.Left
+    local pList = Players:GetPlayers()
+    table.sort(pList, function(a, b) return a.Name:lower() < b.Name:lower() end)
 
-  local function makeFlingBtn(text, posScale, yOffset, color, parent)
-      local b = Instance.new("TextButton", parent)
-      b.BackgroundColor3 = color
-      b.Position = UDim2.new(posScale, 0, 0, yOffset)
-      b.Size = UDim2.new(0.48, 0, 0, 35)
-      b.Font = Enum.Font.GothamBold
-      b.Text = text
-      b.TextColor3 = theme.TextPrimary
-      b.TextSize = 12
-      Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
-      return b
-  end
+    local yPos = 0
+    for _, p in ipairs(pList) do
+        if p ~= localPlayer then
+            local entry = Instance.new("Frame", pScroll)
+            entry.BackgroundTransparency = 1
+            entry.Size = UDim2.new(1, 0, 0, 25)
+            entry.Position = UDim2.new(0, 0, 0, yPos)
 
-  local startFlingBtn = makeFlingBtn("START FLING", 0, 60, Color3.fromRGB(0, 150, 0), flingPage)
-  local stopFlingBtn = makeFlingBtn("STOP FLING", 0.52, 60, theme.Warning, flingPage)
+            local cb = Instance.new("TextButton", entry)
+            cb.BackgroundColor3 = theme.BackgroundTertiary
+            cb.Size = UDim2.new(0, 18, 0, 18)
+            cb.Position = UDim2.new(0, 5, 0.5, -9)
+            cb.Text = ""
+            Instance.new("UICorner", cb).CornerRadius = UDim.new(0, 4)
+            local cbStroke = Instance.new("UIStroke", cb)
+            cbStroke.Color = theme.AccentSecondary
+            cbStroke.Thickness = 1
 
-  local selectAllBtn = makeFlingBtn("SELECT ALL", 0, 105, theme.BackgroundTertiary, flingPage)
-  local deselectAllBtn = makeFlingBtn("DESELECT ALL", 0.52, 105, theme.BackgroundTertiary, flingPage)
-  selectAllBtn.Font = Enum.Font.Gotham
-  deselectAllBtn.Font = Enum.Font.Gotham
+            local cm = Instance.new("TextLabel", cb)
+            cm.BackgroundTransparency = 1
+            cm.Size = UDim2.new(1, 0, 1, 0)
+            cm.Font = Enum.Font.GothamBold
+            cm.Text = "✓"
+            cm.TextColor3 = theme.Success
+            cm.TextSize = 14
+            cm.Visible = SelectedTargets[p.Name] ~= nil
 
-  local pListFrame = Instance.new("Frame", flingPage)
-  pListFrame.BackgroundColor3 = theme.BackgroundSecondary
-  pListFrame.Position = UDim2.new(0, 0, 0, 150)
-  pListFrame.Size = UDim2.new(1, 0, 0, 200)
-  Instance.new("UICorner", pListFrame).CornerRadius = UDim.new(0, 12)
-  local pListStroke = Instance.new("UIStroke", pListFrame)
-  pListStroke.Color = theme.AccentSecondary
-  pListStroke.Thickness = 1
-  pListStroke.Transparency = 0.5
+            local nameLbl = Instance.new("TextLabel", entry)
+            nameLbl.BackgroundTransparency = 1
+            nameLbl.Position = UDim2.new(0, 30, 0, 0)
+            nameLbl.Size = UDim2.new(1, -35, 1, 0)
+            nameLbl.Font = Enum.Font.Gotham
+            nameLbl.Text = p.DisplayName .. " (@" .. p.Name .. ")"
+            nameLbl.TextColor3 = theme.TextSecondary
+            nameLbl.TextSize = 12
+            nameLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-  local pScroll = Instance.new("ScrollingFrame", pListFrame)
-  pScroll.BackgroundTransparency = 1
-  pScroll.Position = UDim2.new(0, 5, 0, 5)
-  pScroll.Size = UDim2.new(1, -10, 1, -10)
-  pScroll.ScrollBarThickness = 4
-  pScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+            local clicker = Instance.new("TextButton", entry)
+            clicker.BackgroundTransparency = 1
+            clicker.Size = UDim2.new(1, 0, 1, 0)
+            clicker.Text = ""
+            clicker.ZIndex = 2
 
-  
-  
+            clicker.MouseButton1Click:Connect(function()
+                if SelectedTargets[p.Name] then
+                    SelectedTargets[p.Name] = nil
+                    cm.Visible = false
+                else
+                    SelectedTargets[p.Name] = p
+                    cm.Visible = true
+                end
+                UpdateFlingStatus()
+            end)
 
-  local function SkidFling(TargetPlayer)
-      local Character = localPlayer.Character
-      local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-      local RootPart = Humanoid and Humanoid.RootPart
-      local TCharacter = TargetPlayer.Character
-      if not TCharacter then return end
-      
-      local THumanoid, TRootPart, THead, Accessory, Handle
-      if TCharacter:FindFirstChildOfClass("Humanoid") then
-          THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
-      end
-      if THumanoid and THumanoid.RootPart then
-          TRootPart = THumanoid.RootPart
-      end
-      if TCharacter:FindFirstChild("Head") then
-          THead = TCharacter.Head
-      end
-      if TCharacter:FindFirstChildOfClass("Accessory") then
-          Accessory = TCharacter:FindFirstChildOfClass("Accessory")
-      end
-      if Accessory and Accessory:FindFirstChild("Handle") then
-          Handle = Accessory.Handle
-      end
-      
-      if Character and Humanoid and RootPart then
-          
-          
-          if THumanoid and THumanoid.Sit then
-              notify("FLING ERROR", TargetPlayer.Name .. " is sitting", 2, "warning")
-              return
-          end
-          
-          if THead then
-              workspace.CurrentCamera.CameraSubject = THead
-          elseif Handle then
-              workspace.CurrentCamera.CameraSubject = Handle
-          elseif THumanoid and TRootPart then
-              workspace.CurrentCamera.CameraSubject = THumanoid
-          end
-          
-          if not TCharacter:FindFirstChildWhichIsA("BasePart") then return end
-          
-          local FPos = function(BasePart, Pos, Ang)
-              RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
-              Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
-              RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
-              RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
-          end
-          
-          local SFBasePart = function(BasePart)
-              local TimeToWait = 2
-              local Time = tick()
-              local Angle = 0
-              repeat
-                  if RootPart and THumanoid then
-                      if BasePart.Velocity.Magnitude < 50 then
-                          Angle = Angle + 100
-                          FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0))
-                          task.wait()
-                          FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                          task.wait()
-                          FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle),0 ,0))
-                          task.wait()
-                          FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                          task.wait()
-                          FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle),0 ,0))
-                          task.wait()
-                          FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
-                          task.wait()
-                      else
-                          FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
-                          task.wait()
-                          FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0))
-                          task.wait()
-                          FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
-                          task.wait()
-                          
-                          FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0))
-                          task.wait()
-                          FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
-                          task.wait()
-                          FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0))
-                          task.wait()
-                          FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
-                          task.wait()
-                      end
-                  end
-              until Time + TimeToWait < tick() or not FlingActive
-          end
-          
-          
-          
-          local BV = Instance.new("BodyVelocity")
-          BV.Parent = RootPart
-          BV.Velocity = Vector3.new(0, 0, 0)
-          BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-          
-          Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-          
-          if TRootPart then
-              SFBasePart(TRootPart)
-          elseif THead then
-              SFBasePart(THead)
-          elseif Handle then
-              SFBasePart(Handle)
-          else
-              notify("FLING ERROR", TargetPlayer.Name .. " has no valid parts", 2, "warning")
-              return
-          end
-          
-          BV:Destroy()
-          Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-          workspace.CurrentCamera.CameraSubject = Humanoid
-          
-          
-      else
-          notify("FLING ERROR", "Your character is not ready", 2, "warning")
-      end
-  end
+            PlayerCheckboxes[p.Name] = { Entry = entry, Checkmark = cm }
+            yPos = yPos + 30
+        end
+    end
+    pScroll.CanvasSize = UDim2.new(0, 0, 0, yPos)
+end
 
-  local function CountSelectedTargets()
-      local c = 0
-      for _ in pairs(SelectedTargets) do c = c + 1 end
-      return c
-  end
+local function ToggleAll(sel)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= localPlayer then
+            local data = PlayerCheckboxes[p.Name]
+            if data then
+                if sel then
+                    SelectedTargets[p.Name] = p
+                    data.Checkmark.Visible = true
+                else
+                    SelectedTargets[p.Name] = nil
+                    data.Checkmark.Visible = false
+                end
+            end
+        end
+    end
+    UpdateFlingStatus()
+end
 
-  local function UpdateFlingStatus()
-      local c = CountSelectedTargets()
-      if FlingActive then
-          flingStatus.Text = "Flinging " .. c .. " target(s)"
-          flingStatus.TextColor3 = theme.Warning
-      else
-          flingStatus.Text = c .. " target(s) selected"
-          flingStatus.TextColor3 = theme.TextPrimary
-      end
-  end
+startFlingBtn.MouseButton1Click:Connect(function()
+    if FlingActive then return end
+    local c = CountSelectedTargets()
+    if c == 0 then
+        notify("FLING", "No targets selected!", 3, "warning")
+        return
+    end
 
-  local function RefreshFlingList()
-      for _, c in pairs(pScroll:GetChildren()) do
-          if c:IsA("Frame") then c:Destroy() end
-      end
-      PlayerCheckboxes = {}
-      
-      local pList = Players:GetPlayers()
-      table.sort(pList, function(a, b) return a.Name:lower() < b.Name:lower() end)
-      
-      local yPos = 0
-      for _, p in ipairs(pList) do
-          if p ~= localPlayer then
-              local entry = Instance.new("Frame", pScroll)
-              entry.BackgroundTransparency = 1
-              entry.Size = UDim2.new(1, 0, 0, 25)
-              entry.Position = UDim2.new(0, 0, 0, yPos)
-              
-              local cb = Instance.new("TextButton", entry)
-              cb.BackgroundColor3 = theme.BackgroundTertiary
-              cb.Size = UDim2.new(0, 18, 0, 18)
-              cb.Position = UDim2.new(0, 5, 0.5, -9)
-              cb.Text = ""
-              Instance.new("UICorner", cb).CornerRadius = UDim.new(0, 4)
-              local cbStroke = Instance.new("UIStroke", cb)
-              cbStroke.Color = theme.AccentSecondary
-              cbStroke.Thickness = 1
-              
-              local cm = Instance.new("TextLabel", cb)
-              cm.BackgroundTransparency = 1
-              cm.Size = UDim2.new(1, 0, 1, 0)
-              cm.Font = Enum.Font.GothamBold
-              cm.Text = "✓"
-              cm.TextColor3 = theme.Success
-              cm.TextSize = 14
-              cm.Visible = SelectedTargets[p.Name] ~= nil
-              
-              local nameLbl = Instance.new("TextLabel", entry)
-              nameLbl.BackgroundTransparency = 1
-              nameLbl.Position = UDim2.new(0, 30, 0, 0)
-              nameLbl.Size = UDim2.new(1, -35, 1, 0)
-              nameLbl.Font = Enum.Font.Gotham
-              nameLbl.Text = p.DisplayName .. " (@" .. p.Name .. ")"
-              nameLbl.TextColor3 = theme.TextSecondary
-              nameLbl.TextSize = 12
-              nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-              
-              local clicker = Instance.new("TextButton", entry)
-              clicker.BackgroundTransparency = 1
-              clicker.Size = UDim2.new(1, 0, 1, 0)
-              clicker.Text = ""
-              clicker.ZIndex = 2
-              
-              clicker.MouseButton1Click:Connect(function()
-                  if SelectedTargets[p.Name] then
-                      SelectedTargets[p.Name] = nil
-                      cm.Visible = false
-                  else
-                      SelectedTargets[p.Name] = p
-                      cm.Visible = true
-                  end
-                  UpdateFlingStatus()
-              end)
-              
-              PlayerCheckboxes[p.Name] = { Entry = entry, Checkmark = cm }
-              yPos = yPos + 30
-          end
-      end
-      pScroll.CanvasSize = UDim2.new(0, 0, 0, yPos)
-  end
+    FlingActive = true
+    UpdateFlingStatus()
+    notify("FLING", "Started flinging " .. c .. " targets", 3, "success")
 
-  local function ToggleAll(sel)
-      for _, p in ipairs(Players:GetPlayers()) do
-          if p ~= localPlayer then
-              local data = PlayerCheckboxes[p.Name]
-              if data then
-                  if sel then
-                      SelectedTargets[p.Name] = p
-                      data.Checkmark.Visible = true
-                  else
-                      SelectedTargets[p.Name] = nil
-                      data.Checkmark.Visible = false
-                  end
-              end
-          end
-      end
-      UpdateFlingStatus()
-  end
+    task.spawn(function()
+        while FlingActive do
+            local valid = {}
+            for name, p in pairs(SelectedTargets) do
+                if p and p.Parent then
+                    valid[name] = p
+                else
+                    SelectedTargets[name] = nil
+                    if PlayerCheckboxes[name] then PlayerCheckboxes[name].Checkmark.Visible = false end
+                end
+            end
 
-  startFlingBtn.MouseButton1Click:Connect(function()
-      if FlingActive then return end
-      local c = CountSelectedTargets()
-      if c == 0 then
-          notify("FLING", "No targets selected!", 3, "warning")
-          return
-      end
-      
-      
-      
-      FlingActive = true
-      UpdateFlingStatus()
-      notify("FLING", "Started flinging " .. c .. " targets", 3, "success")
-      
-      task.spawn(function()
-          while FlingActive do
-              local valid = {}
-              for name, p in pairs(SelectedTargets) do
-                  if p and p.Parent then
-                      valid[name] = p
-                  else
-                      SelectedTargets[name] = nil
-                      if PlayerCheckboxes[name] then PlayerCheckboxes[name].Checkmark.Visible = false end
-                  end
-              end
-              
-              for _, p in pairs(valid) do
-                  if FlingActive then
-                      SkidFling(p)
-                      task.wait(0.1)
-                  else break end
-              end
-              UpdateFlingStatus()
-              task.wait(0.5)
-          end
-      end)
-  end)
+            for _, p in pairs(valid) do
+                if FlingActive then
+                    SkidFling(p)
+                    task.wait(0.1)
+                else break end
+            end
+            UpdateFlingStatus()
+            task.wait(0.5)
+        end
+    end)
+end)
 
-  stopFlingBtn.MouseButton1Click:Connect(function()
-      if not FlingActive then return end
-      FlingActive = false
-      UpdateFlingStatus()
-      notify("FLING", "Fling stopped", 3, "success")
-      
-      -- Restore original position
-      if getgenv().OldPos then
-          local char = localPlayer.Character
-          local hrp = char and char:FindFirstChild("HumanoidRootPart")
-          if hrp then
-              hrp.CFrame = getgenv().OldPos * CFrame.new(0, 3, 0)
-          end
-          
-      end
-  end)
+stopFlingBtn.MouseButton1Click:Connect(function()
+    if not FlingActive then return end
+    FlingActive = false
+    UpdateFlingStatus()
+    notify("FLING", "Fling stopped", 3, "success")
 
-  selectAllBtn.MouseButton1Click:Connect(function() ToggleAll(true) end)
-  deselectAllBtn.MouseButton1Click:Connect(function() ToggleAll(false) end)
+    if getgenv().OldPos then
+        local char = localPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = getgenv().OldPos * CFrame.new(0, 3, 0)
+        end
+    end
+end)
 
-  Players.PlayerAdded:Connect(function()
-      task.wait(1)
-      RefreshFlingList()
-  end)
-  Players.PlayerRemoving:Connect(function(p)
-      if SelectedTargets[p.Name] then SelectedTargets[p.Name] = nil end
-      RefreshFlingList()
-      UpdateFlingStatus()
-  end)
+selectAllBtn.MouseButton1Click:Connect(function() ToggleAll(true) end)
+deselectAllBtn.MouseButton1Click:Connect(function() ToggleAll(false) end)
 
-  RefreshFlingList()
-  flingPage.CanvasSize = UDim2.new(0, 0, 0, 360)
+Players.PlayerAdded:Connect(function()
+    task.wait(1)
+    RefreshFlingList()
+end)
+Players.PlayerRemoving:Connect(function(p)
+    if SelectedTargets[p.Name] then SelectedTargets[p.Name] = nil end
+    RefreshFlingList()
+    UpdateFlingStatus()
+end)
 
-  
+RefreshFlingList()
+flingPage.CanvasSize = UDim2.new(0, 0, 0, 360)
+
 -- Dragging logic
 local dragging, dragInput, dragStart, startPos
 main.InputBegan:Connect(function(input)
@@ -1369,7 +1339,7 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
 end)
 
--- Toggle Menu visibility
+-- Toggle Menu visibility + F1 hotkey
 main.Visible = state.Visible
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
@@ -1390,6 +1360,4 @@ end
 Players.PlayerAdded:Connect(applyESP)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
-notify("STAFF ALERT STARTED", "T to toggle menu", 5, "success")
-
-
+notify("STAFF ALERT STARTED", "T to toggle menu | F1 to check active staff", 5, "success")
