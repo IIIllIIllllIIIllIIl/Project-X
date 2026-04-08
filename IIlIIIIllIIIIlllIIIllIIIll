@@ -523,7 +523,7 @@ topAnnouncement.Position = UDim2.new(0, 165, 0, 0)
 topAnnouncement.Size = UDim2.new(1, -130, 1, 0)
 topAnnouncement.Font = Enum.Font.GothamBold
 --xx Updated:                                                          --
-topAnnouncement.Text = "Updated: 06/04/2026 | Game removed | Not up to date"
+topAnnouncement.Text = "Updated: 08/04/2026 | Group updated"
 topAnnouncement.TextColor3 = theme.TextSecondary
 topAnnouncement.TextSize = 17
 topAnnouncement.TextXAlignment = Enum.TextXAlignment.Left
