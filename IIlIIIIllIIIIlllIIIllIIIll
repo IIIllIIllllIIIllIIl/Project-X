@@ -69,9 +69,9 @@ local state = {
 }
 
 -- === GROUP CONFIG ===
-local MAIN_GROUP_ID = 506714341
+local MAIN_GROUP_ID = 40382415
 
-local POSSIBLE_STAFF_GROUP_IDS = { 708955176, 344541287, 526649056 }
+local POSSIBLE_STAFF_GROUP_IDS = { 338509474, 344541287, 526649056 }
 
 -- Group name cache — fetched live from Roblox, never hardcoded
 local groupNameCache = {}
