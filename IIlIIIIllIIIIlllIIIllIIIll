@@ -540,7 +540,7 @@ topAnnouncement.Position = UDim2.new(0, 165, 0, 0)
 topAnnouncement.Size = UDim2.new(1, -130, 1, 0)
 topAnnouncement.Font = Enum.Font.GothamBold
 --xx Updated:                                                          --
-topAnnouncement.Text = "Updated: 08/04/2026 | Group updated"
+topAnnouncement.Text = "Updated: 22/04/2026 | 2 VF groups added"
 topAnnouncement.TextColor3 = theme.TextSecondary
 topAnnouncement.TextSize = 17
 topAnnouncement.TextXAlignment = Enum.TextXAlignment.Left
@@ -797,6 +797,7 @@ local INFO_LINES = {
 -- xx UPDATES
 -- New items (+) should go at the TOP of this list.
 local UPDATE_LINES = {
+    "+ Added second VF staff group",
     "+ Fixed esp bugs",
     "+ Revamped Info/Updates",
     "+ Added Experimental functions",
