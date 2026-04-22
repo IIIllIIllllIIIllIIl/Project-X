@@ -69,7 +69,7 @@ local state = {
 }
 
 -- === GROUP CONFIG ===
-local MAIN_GROUP_ID = 40382415
+local MAIN_GROUP_IDS = { 40382415, 769816120 }
 
 local POSSIBLE_STAFF_GROUP_IDS = { 338509474, 344541287, 526649056 }
 
@@ -85,7 +85,8 @@ end
 
 -- Pre-cache all group names at startup so they are ready instantly on first join/leave
 task.spawn(function()
-    local allIds = { MAIN_GROUP_ID }
+    local allIds = {}
+    for _, id in ipairs(MAIN_GROUP_IDS) do table.insert(allIds, id) end
     for _, id in ipairs(POSSIBLE_STAFF_GROUP_IDS) do table.insert(allIds, id) end
     for _, id in ipairs(allIds) do
         pcall(function()
@@ -236,12 +237,17 @@ local function playSound(id, vol)
     s.Ended:Connect(function() s:Destroy() end)
 end
 
--- Returns the player's role in the main group, or nil if not a member
-local function getMainRole(player)
-    local ok, inGroup = pcall(function() return player:IsInGroup(MAIN_GROUP_ID) end)
-    if not (ok and inGroup) then return nil end
-    local ok2, role = pcall(function() return player:GetRoleInGroup(MAIN_GROUP_ID) end)
-    return ok2 and role or "Member"
+-- Returns a list of {id, role} for every main staff group the player is in
+local function getMainMemberships(player)
+    local result = {}
+    for _, gid in ipairs(MAIN_GROUP_IDS) do
+        local ok, inGroup = pcall(function() return player:IsInGroup(gid) end)
+        if ok and inGroup then
+            local ok2, role = pcall(function() return player:GetRoleInGroup(gid) end)
+            table.insert(result, { id = gid, role = ok2 and role or "Member" })
+        end
+    end
+    return result
 end
 
 -- Returns a list of {id, role} for every possible staff group the player is in
@@ -260,28 +266,33 @@ end
 local function isUndercover(player, alreadyInMain)
     if not UNDERCOVER_USERIDS[player.UserId] then return false end
     if alreadyInMain ~= nil then return not alreadyInMain end
-    local ok, res = pcall(function() return player:IsInGroup(MAIN_GROUP_ID) end)
-    return not (ok and res)
+    for _, gid in ipairs(MAIN_GROUP_IDS) do
+        local ok, res = pcall(function() return player:IsInGroup(gid) end)
+        if ok and res then return false end
+    end
+    return true
 end
 
 -- Builds the notifier title, body, and outline colour for a join/leave event
-local function buildNotif(player, action, mainRole, possible)
+local function buildNotif(player, action, mains, possible)
     local dn = getDisplayName(player)
     local un = player.Name
-    local inMain = mainRole ~= nil
+    mains = mains or {}
+    local inMain = #mains > 0
     local inPossible = #possible > 0
     local title, body, color
-
-    local mainName = getGroupName(MAIN_GROUP_ID)
 
     if inMain and inPossible then
         -- Green (main has priority)
         color = theme.Success
-        local names = { mainName }
+        local names = {}
+        for _, m in ipairs(mains)    do table.insert(names, getGroupName(m.id)) end
         for _, m in ipairs(possible) do table.insert(names, getGroupName(m.id)) end
         title = dn .. " | " .. table.concat(names, " & ")
         local parts = { dn .. " (@" .. un .. ")" }
-        table.insert(parts, mainName .. ": " .. mainRole)
+        for _, m in ipairs(mains) do
+            table.insert(parts, getGroupName(m.id) .. ": " .. m.role)
+        end
         for _, m in ipairs(possible) do
             table.insert(parts, getGroupName(m.id) .. " (Possible Staff Group): " .. m.role)
         end
@@ -290,8 +301,14 @@ local function buildNotif(player, action, mainRole, possible)
     elseif inMain then
         -- Main group only — green
         color = theme.Success
-        title = dn .. " | " .. mainName
-        body  = dn .. " (@" .. un .. ") — " .. mainRole .. " — " .. action
+        local names = {}
+        for _, m in ipairs(mains) do table.insert(names, getGroupName(m.id)) end
+        title = dn .. " | " .. table.concat(names, " & ")
+        local parts = { dn .. " (@" .. un .. ")" }
+        for _, m in ipairs(mains) do
+            table.insert(parts, getGroupName(m.id) .. ": " .. m.role)
+        end
+        body = table.concat(parts, " | ") .. " — " .. action
 
     elseif inPossible then
         -- Possible group(s) only — yellow
@@ -345,9 +362,9 @@ local function applyESP(player)
         if player.Character then updateDisplay() end
     end
 
-    local mainRole   = getMainRole(player)
+    local mains      = getMainMemberships(player)
     local possible   = getPossibleMemberships(player)
-    local inMain     = mainRole ~= nil
+    local inMain     = #mains > 0
     local inPossible = #possible > 0
     local isU        = isUndercover(player, inMain)
     local category   = getPlayerCategory(inMain, isU, inPossible)
@@ -385,7 +402,7 @@ local function applyESP(player)
     end
 
     if category == "main" then
-        local title, body, color = buildNotif(player, "joined", mainRole, possible)
+        local title, body, color = buildNotif(player, "joined", mains, possible)
         notify(title, body, 5, nil, color)
         playSound("rbxassetid://8887499160", 2)
     elseif category == "undercover" then
@@ -411,9 +428,9 @@ local function applyESP(player)
 end
 
 local function onPlayerRemoving(player)
-    local mainRole   = getMainRole(player)
+    local mains      = getMainMemberships(player)
     local possible   = getPossibleMemberships(player)
-    local inMain     = mainRole ~= nil
+    local inMain     = #mains > 0
     local inPossible = #possible > 0
     local isU        = isUndercover(player, inMain)
     local category   = getPlayerCategory(inMain, isU, inPossible)
@@ -422,7 +439,7 @@ local function onPlayerRemoving(player)
     playSound("rbxassetid://1091083826", 2)
 
     if category == "main" then
-        local title, body, color = buildNotif(player, "left", mainRole, possible)
+        local title, body, color = buildNotif(player, "left", mains, possible)
         notify(title, body, 5, nil, color)
         local hl = state.StaffESPFolder:FindFirstChild("HL_" .. player.UserId)
         if hl then hl:Destroy() end
@@ -1030,17 +1047,17 @@ local function showStaffNotification()
     local mainLines, undLines, possLines = {}, {}, {}
 
     for _, p in ipairs(Players:GetPlayers()) do
-        local mainRole   = getMainRole(p)
+        local mains      = getMainMemberships(p)
         local possible   = getPossibleMemberships(p)
-        local inMain     = mainRole ~= nil
+        local inMain     = #mains > 0
         local inPossible = #possible > 0
         local isU        = isUndercover(p, inMain)
         local category   = getPlayerCategory(inMain, isU, inPossible)
         if not category then continue end
 
         local parts = {}
-        if inMain then
-            table.insert(parts, getGroupName(MAIN_GROUP_ID) .. ": " .. mainRole)
+        for _, m in ipairs(mains) do
+            table.insert(parts, getGroupName(m.id) .. ": " .. m.role)
         end
         if isU and not inMain then
             table.insert(parts, "[!] UNDERCOVER")
@@ -1260,9 +1277,9 @@ local function refreshStaffList()
 
     for _, p in ipairs(Players:GetPlayers()) do
         if p == localPlayer then continue end
-        local mainRole   = getMainRole(p)
+        local mains      = getMainMemberships(p)
         local possible   = getPossibleMemberships(p)
-        local inMain     = mainRole ~= nil
+        local inMain     = #mains > 0
         local inPossible = #possible > 0
         local isU        = isUndercover(p, inMain)
         local category   = getPlayerCategory(inMain, isU, inPossible)
@@ -1271,7 +1288,9 @@ local function refreshStaffList()
         local nameText = p.DisplayName .. " (@" .. p.Name .. ")"
 
         if inMain then
-            local detail = getGroupName(MAIN_GROUP_ID) .. ": " .. mainRole
+            local mainParts = {}
+            for _, m in ipairs(mains) do table.insert(mainParts, getGroupName(m.id) .. ": " .. m.role) end
+            local detail = table.concat(mainParts, "  |  ")
             if inPossible then
                 local extras = {}
                 for _, m in ipairs(possible) do table.insert(extras, getGroupName(m.id) .. ": " .. m.role) end
@@ -1314,8 +1333,10 @@ end)
 -- Used so we only refresh the list when someone who matters joins or leaves.
 local function isRelevantPlayer(p)
     if UNDERCOVER_USERIDS[p.UserId] then return true end
-    local ok, inMain = pcall(function() return p:IsInGroup(MAIN_GROUP_ID) end)
-    if ok and inMain then return true end
+    for _, gid in ipairs(MAIN_GROUP_IDS) do
+        local ok, inMain = pcall(function() return p:IsInGroup(gid) end)
+        if ok and inMain then return true end
+    end
     for _, gid in ipairs(POSSIBLE_STAFF_GROUP_IDS) do
         local ok2, inG = pcall(function() return p:IsInGroup(gid) end)
         if ok2 and inG then return true end
